@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { useCreateGame } from '../../hooks/useGame'
 
 const MAZE_SIZES = [
@@ -53,97 +52,88 @@ export default function NewGamePage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center p-8">
-      <div className="w-full max-w-xl">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <Link href="/" className="text-zinc-400 hover:text-zinc-300 text-sm">
-            ← Back
-          </Link>
-          <h1 className="text-2xl font-bold">Create New Game</h1>
-          <div className="w-16" />
+    <div className="max-w-xl mx-auto px-6 py-8">
+      <h2 className="text-2xl font-bold text-center mb-8">Create New Game</h2>
+
+      <form onSubmit={handleCreate} className="space-y-6">
+        {/* Maze Size */}
+        <div>
+          <label className="block text-sm text-zinc-400 mb-3">Maze Size</label>
+          <div className="grid grid-cols-4 gap-2">
+            {MAZE_SIZES.map((size) => (
+              <button
+                key={size.value}
+                type="button"
+                onClick={() => setMazeSize(size.value)}
+                className={`px-4 py-3 rounded-lg text-sm transition-colors ${
+                  mazeSize === size.value
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                }`}
+              >
+                <div className="font-medium">{size.label}</div>
+                <div className="text-xs opacity-70">{size.desc}</div>
+              </button>
+            ))}
+          </div>
         </div>
 
-        <form onSubmit={handleCreate} className="space-y-6">
-          {/* Maze Size */}
-          <div>
-            <label className="block text-sm text-zinc-400 mb-3">Maze Size</label>
-            <div className="grid grid-cols-4 gap-2">
-              {MAZE_SIZES.map((size) => (
+        {/* Player Name */}
+        <div>
+          <label className="block text-sm text-zinc-400 mb-1">
+            Your Mouse Name <span className="text-zinc-600">(optional)</span>
+          </label>
+          <input
+            type="text"
+            value={playerName}
+            onChange={(e) => setPlayerName(e.target.value)}
+            placeholder="Player 1"
+            maxLength={20}
+            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-emerald-500"
+          />
+        </div>
+
+        {/* Strategy Prompt */}
+        <div>
+          <label className="block text-sm text-zinc-400 mb-1">AI Strategy Prompt</label>
+          <textarea
+            value={playerPrompt}
+            onChange={(e) => setPlayerPrompt(e.target.value)}
+            placeholder="Describe how your AI mouse should navigate the maze..."
+            maxLength={500}
+            rows={4}
+            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-emerald-500 resize-none"
+          />
+          <div className="mt-2">
+            <span className="text-xs text-zinc-500">Or pick a preset:</span>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {PRESET_STRATEGIES.map((strategy) => (
                 <button
-                  key={size.value}
+                  key={strategy.name}
                   type="button"
-                  onClick={() => setMazeSize(size.value)}
-                  className={`px-4 py-3 rounded-lg text-sm transition-colors ${
-                    mazeSize === size.value
-                      ? 'bg-emerald-600 text-white'
-                      : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
-                  }`}
+                  onClick={() => setPlayerPrompt(strategy.prompt)}
+                  className="px-3 py-1 text-xs bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-colors"
                 >
-                  <div className="font-medium">{size.label}</div>
-                  <div className="text-xs opacity-70">{size.desc}</div>
+                  {strategy.name}
                 </button>
               ))}
             </div>
           </div>
+        </div>
 
-          {/* Player Name */}
-          <div>
-            <label className="block text-sm text-zinc-400 mb-1">
-              Your Mouse Name <span className="text-zinc-600">(optional)</span>
-            </label>
-            <input
-              type="text"
-              value={playerName}
-              onChange={(e) => setPlayerName(e.target.value)}
-              placeholder="Player 1"
-              maxLength={20}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-emerald-500"
-            />
-          </div>
+        {/* Submit */}
+        <button
+          type="submit"
+          disabled={createGame.isPending || !playerPrompt.trim()}
+          className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 disabled:cursor-not-allowed text-white font-semibold py-4 px-8 rounded-xl transition-colors text-lg"
+        >
+          {createGame.isPending ? 'Creating...' : 'Create Game'}
+        </button>
 
-          {/* Strategy Prompt */}
-          <div>
-            <label className="block text-sm text-zinc-400 mb-1">AI Strategy Prompt</label>
-            <textarea
-              value={playerPrompt}
-              onChange={(e) => setPlayerPrompt(e.target.value)}
-              placeholder="Describe how your AI mouse should navigate the maze..."
-              maxLength={500}
-              rows={4}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-emerald-500 resize-none"
-            />
-            <div className="mt-2">
-              <span className="text-xs text-zinc-500">Or pick a preset:</span>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {PRESET_STRATEGIES.map((strategy) => (
-                  <button
-                    key={strategy.name}
-                    type="button"
-                    onClick={() => setPlayerPrompt(strategy.prompt)}
-                    className="px-3 py-1 text-xs bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-colors"
-                  >
-                    {strategy.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Submit */}
-          <button
-            type="submit"
-            disabled={createGame.isPending || !playerPrompt.trim()}
-            className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 disabled:cursor-not-allowed text-white font-semibold py-4 px-8 rounded-xl transition-colors text-lg"
-          >
-            {createGame.isPending ? 'Creating...' : 'Create Game'}
-          </button>
-
-          {createGame.error && (
-            <p className="text-red-400 text-sm text-center">{createGame.error.message}</p>
-          )}
-        </form>
-      </div>
+        {createGame.error && (
+          <p className="text-red-400 text-sm text-center">{createGame.error.message}</p>
+        )}
+      </form>
     </div>
   )
 }

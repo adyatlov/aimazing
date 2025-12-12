@@ -135,165 +135,161 @@ export default function GamePage() {
   const opponent = game.mice[1]
 
   return (
-    <div className="min-h-screen flex flex-col items-center p-4 md:p-8">
-      <div className="w-full max-w-4xl">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <Link href="/" className="text-zinc-400 hover:text-zinc-300 text-sm">
-            ← Back
-          </Link>
-          <div className="flex items-center gap-3">
-            <span className="text-zinc-500 font-mono text-sm">{gameId}</span>
-            <span className={`px-2 py-1 rounded text-xs font-medium ${
-              game.status === 'WAITING' ? 'bg-yellow-900/50 text-yellow-400' :
-              game.status === 'PLAYING' ? 'bg-emerald-900/50 text-emerald-400' :
-              'bg-zinc-800 text-zinc-400'
-            }`}>
-              {game.status}
-            </span>
-            <span className={`flex items-center gap-2 text-sm ${connected ? 'text-emerald-400' : 'text-yellow-400'}`}>
-              <span className={`w-2 h-2 rounded-full ${connected ? 'bg-emerald-400' : 'bg-yellow-400'} animate-pulse`} />
-            </span>
-          </div>
+    <div className="max-w-5xl mx-auto px-6 py-6">
+      {/* Game Status Bar */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <span className="text-zinc-500 font-mono text-sm">{gameId}</span>
+          <span className={`px-2 py-1 rounded text-xs font-medium ${
+            game.status === 'WAITING' ? 'bg-yellow-900/50 text-yellow-400' :
+            game.status === 'PLAYING' ? 'bg-emerald-900/50 text-emerald-400' :
+            'bg-zinc-800 text-zinc-400'
+          }`}>
+            {game.status}
+          </span>
         </div>
-
-        {/* Progress bar (when playing/finished) */}
-        {game.status !== 'WAITING' && (
-          <div className="mb-4">
-            <div className="flex justify-between text-xs text-zinc-500 mb-1">
-              <span>Turn {game.turn}</span>
-              <span>{game.maxTurns} max</span>
-            </div>
-            <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
-              <div
-                className={`h-full transition-all duration-300 ${finished ? 'bg-zinc-600' : 'bg-emerald-500'}`}
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Maze */}
-        <div className="flex justify-center mb-6">
-          <MazeRenderer game={game} size="lg" />
-        </div>
-
-        {/* Player Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          {/* Creator card */}
-          {creator && (
-            <div className={`p-4 rounded-xl border ${
-              game.status === 'CREATOR_WIN' ? 'bg-emerald-900/20 border-emerald-600' :
-              'bg-zinc-900/50 border-zinc-800'
-            }`}>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="w-3 h-3 rounded-full bg-green-500" />
-                <span className="font-semibold">{creator.name}</span>
-                {isPlayer && game.myPrompt && <span className="text-xs text-emerald-400">(You)</span>}
-              </div>
-              {isPlayer && game.myPrompt ? (
-                <p className="text-xs text-zinc-400 line-clamp-2 mb-3">{game.myPrompt}</p>
-              ) : (
-                <p className="text-xs text-zinc-600 italic mb-3">Strategy hidden</p>
-              )}
-              <div className="flex items-center gap-4 text-xs text-zinc-500">
-                <span>Pos: ({creator.position.x}, {creator.position.y})</span>
-                <span>Facing: {creator.facing}</span>
-              </div>
-            </div>
-          )}
-
-          {/* Opponent card or waiting/join */}
-          {opponent ? (
-            <div className={`p-4 rounded-xl border ${
-              game.status === 'OPPONENT_WIN' ? 'bg-emerald-900/20 border-emerald-600' :
-              'bg-zinc-900/50 border-zinc-800'
-            }`}>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="w-3 h-3 rounded-full bg-blue-500" />
-                <span className="font-semibold">{opponent.name}</span>
-              </div>
-              <p className="text-xs text-zinc-600 italic mb-3">Strategy hidden</p>
-              <div className="flex items-center gap-4 text-xs text-zinc-500">
-                <span>Pos: ({opponent.position.x}, {opponent.position.y})</span>
-                <span>Facing: {opponent.facing}</span>
-              </div>
-            </div>
-          ) : canJoin ? (
-            <div className="p-4 rounded-xl border bg-zinc-900/50 border-zinc-800">
-              <h3 className="font-semibold mb-3">Join Game</h3>
-              <div className="space-y-3">
-                <input
-                  type="text"
-                  value={playerName}
-                  onChange={(e) => setPlayerName(e.target.value)}
-                  placeholder="Your name (optional)"
-                  maxLength={20}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-emerald-500"
-                />
-                <textarea
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  placeholder="Describe your AI strategy..."
-                  maxLength={500}
-                  rows={2}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-emerald-500 resize-none"
-                />
-                <div className="flex flex-wrap gap-1">
-                  {PRESET_STRATEGIES.map((s) => (
-                    <button
-                      key={s.name}
-                      onClick={() => setPrompt(s.prompt)}
-                      className="px-2 py-1 text-xs bg-zinc-800 hover:bg-zinc-700 rounded transition-colors"
-                    >
-                      {s.name}
-                    </button>
-                  ))}
-                </div>
-                <button
-                  onClick={handleJoin}
-                  disabled={joinGame.isPending || !prompt.trim()}
-                  className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 text-white font-medium py-2 px-4 rounded-lg transition-colors text-sm"
-                >
-                  {joinGame.isPending ? 'Joining...' : 'Join Game'}
-                </button>
-                {joinGame.error && (
-                  <p className="text-red-400 text-xs">{joinGame.error.message}</p>
-                )}
-              </div>
-            </div>
-          ) : isPlayer ? (
-            <div className="p-4 rounded-xl border border-dashed border-zinc-700 bg-zinc-900/30 flex flex-col items-center justify-center text-center">
-              <p className="text-zinc-400 mb-3">Waiting for opponent...</p>
-              <ShareLink gameId={gameId} />
-            </div>
-          ) : null}
-        </div>
-
-        {/* Result Banner */}
-        {finished && (
-          <div className="flex flex-col items-center gap-4 p-6 bg-zinc-900/50 rounded-2xl border border-zinc-800">
-            <div className="text-3xl font-bold">
-              {game.status === 'CREATOR_WIN' && (
-                <span className="text-green-400">{creator?.name} Wins!</span>
-              )}
-              {game.status === 'OPPONENT_WIN' && (
-                <span className="text-blue-400">{opponent?.name} Wins!</span>
-              )}
-              {game.status === 'DRAW' && (
-                <span className="text-yellow-400">It&apos;s a Draw!</span>
-              )}
-            </div>
-            <p className="text-zinc-400">Finished in {game.turn} turns</p>
-            <Link
-              href="/"
-              className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 px-8 rounded-xl transition-colors"
-            >
-              Back to Games
-            </Link>
-          </div>
-        )}
+        <span className={`flex items-center gap-2 text-sm ${connected ? 'text-emerald-400' : 'text-yellow-400'}`}>
+          <span className={`w-2 h-2 rounded-full ${connected ? 'bg-emerald-400' : 'bg-yellow-400'} animate-pulse`} />
+          {connected ? 'Live' : 'Connecting...'}
+        </span>
       </div>
+
+      {/* Progress bar (when playing/finished) */}
+      {game.status !== 'WAITING' && (
+        <div className="mb-6">
+          <div className="flex justify-between text-xs text-zinc-500 mb-1">
+            <span>Turn {game.turn}</span>
+            <span>{game.maxTurns} max</span>
+          </div>
+          <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+            <div
+              className={`h-full transition-all duration-300 ${finished ? 'bg-zinc-600' : 'bg-emerald-500'}`}
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Maze */}
+      <div className="flex justify-center mb-6">
+        <MazeRenderer game={game} size="lg" />
+      </div>
+
+      {/* Player Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        {/* Creator card */}
+        {creator && (
+          <div className={`p-4 rounded-xl border ${
+            game.status === 'CREATOR_WIN' ? 'bg-emerald-900/20 border-emerald-600' :
+            'bg-zinc-900/50 border-zinc-800'
+          }`}>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="w-3 h-3 rounded-full bg-green-500" />
+              <span className="font-semibold">{creator.name}</span>
+              {isPlayer && game.myPrompt && <span className="text-xs text-emerald-400">(You)</span>}
+            </div>
+            {isPlayer && game.myPrompt ? (
+              <p className="text-xs text-zinc-400 line-clamp-2 mb-3">{game.myPrompt}</p>
+            ) : (
+              <p className="text-xs text-zinc-600 italic mb-3">Strategy hidden</p>
+            )}
+            <div className="flex items-center gap-4 text-xs text-zinc-500">
+              <span>Pos: ({creator.position.x}, {creator.position.y})</span>
+              <span>Facing: {creator.facing}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Opponent card or waiting/join */}
+        {opponent ? (
+          <div className={`p-4 rounded-xl border ${
+            game.status === 'OPPONENT_WIN' ? 'bg-emerald-900/20 border-emerald-600' :
+            'bg-zinc-900/50 border-zinc-800'
+          }`}>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="w-3 h-3 rounded-full bg-blue-500" />
+              <span className="font-semibold">{opponent.name}</span>
+            </div>
+            <p className="text-xs text-zinc-600 italic mb-3">Strategy hidden</p>
+            <div className="flex items-center gap-4 text-xs text-zinc-500">
+              <span>Pos: ({opponent.position.x}, {opponent.position.y})</span>
+              <span>Facing: {opponent.facing}</span>
+            </div>
+          </div>
+        ) : canJoin ? (
+          <div className="p-4 rounded-xl border bg-zinc-900/50 border-zinc-800">
+            <h3 className="font-semibold mb-3">Join Game</h3>
+            <div className="space-y-3">
+              <input
+                type="text"
+                value={playerName}
+                onChange={(e) => setPlayerName(e.target.value)}
+                placeholder="Your name (optional)"
+                maxLength={20}
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-emerald-500"
+              />
+              <textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder="Describe your AI strategy..."
+                maxLength={500}
+                rows={2}
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-emerald-500 resize-none"
+              />
+              <div className="flex flex-wrap gap-1">
+                {PRESET_STRATEGIES.map((s) => (
+                  <button
+                    key={s.name}
+                    onClick={() => setPrompt(s.prompt)}
+                    className="px-2 py-1 text-xs bg-zinc-800 hover:bg-zinc-700 rounded transition-colors"
+                  >
+                    {s.name}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={handleJoin}
+                disabled={joinGame.isPending || !prompt.trim()}
+                className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 text-white font-medium py-2 px-4 rounded-lg transition-colors text-sm"
+              >
+                {joinGame.isPending ? 'Joining...' : 'Join Game'}
+              </button>
+              {joinGame.error && (
+                <p className="text-red-400 text-xs">{joinGame.error.message}</p>
+              )}
+            </div>
+          </div>
+        ) : isPlayer ? (
+          <div className="p-4 rounded-xl border border-dashed border-zinc-700 bg-zinc-900/30 flex flex-col items-center justify-center text-center">
+            <p className="text-zinc-400 mb-3">Waiting for opponent...</p>
+            <ShareLink gameId={gameId} />
+          </div>
+        ) : null}
+      </div>
+
+      {/* Result Banner */}
+      {finished && (
+        <div className="flex flex-col items-center gap-4 p-6 bg-zinc-900/50 rounded-2xl border border-zinc-800">
+          <div className="text-3xl font-bold">
+            {game.status === 'CREATOR_WIN' && (
+              <span className="text-green-400">{creator?.name} Wins!</span>
+            )}
+            {game.status === 'OPPONENT_WIN' && (
+              <span className="text-blue-400">{opponent?.name} Wins!</span>
+            )}
+            {game.status === 'DRAW' && (
+              <span className="text-yellow-400">It&apos;s a Draw!</span>
+            )}
+          </div>
+          <p className="text-zinc-400">Finished in {game.turn} turns</p>
+          <Link
+            href="/"
+            className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 px-8 rounded-xl transition-colors"
+          >
+            Back to Games
+          </Link>
+        </div>
+      )}
     </div>
   )
 }
