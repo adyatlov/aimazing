@@ -6,8 +6,18 @@ function posKey(x: number, y: number): string {
   return `${x},${y}`
 }
 
-export function createGameState(mazeSize: number, maxTurns?: number): GameState {
-  const { maze, entrance, exit } = generateMaze(mazeSize)
+export interface MazePreview {
+  maze: Maze
+  entrance: Position
+  exit: Position
+}
+
+export function createMazePreview(mazeSize: number): MazePreview {
+  return generateMaze(mazeSize)
+}
+
+export function createGameState(mazeSize: number, maxTurns?: number, existingMaze?: MazePreview): GameState {
+  const { maze, entrance, exit } = existingMaze ?? generateMaze(mazeSize)
   return {
     maze,
     entrance,

@@ -2,13 +2,19 @@ import { os } from '@orpc/server'
 import { z } from 'zod'
 import { randomUUID } from 'crypto'
 import { gameStore } from './lib/sqliteGameStore'
-import { createGameState, getMouseVision, executeTurn } from './lib/game'
+import { createGameState, createMazePreview, getMouseVision, executeTurn } from './lib/game'
 import { getActions } from './lib/ai'
 import type { Game, GameListItem } from './lib/gameStore'
 import type { GameStatus } from './lib/db'
 
 // Schemas
 const PositionSchema = z.object({ x: z.number(), y: z.number() })
+const MazeSchema = z.array(z.array(z.enum(['WALL', 'PATH'])))
+const MazePreviewSchema = z.object({
+  maze: MazeSchema,
+  entrance: PositionSchema,
+  exit: PositionSchema,
+})
 const MouseSchema = z.object({
   name: z.string(),
   position: PositionSchema,
@@ -154,10 +160,19 @@ async function runGameLoop(gameId: string): Promise<void> {
 }
 
 // API Procedures
+export const previewMazeProcedure = os
+  .input(z.object({
+    mazeSize: z.number().min(7).max(51).default(15),
+  }))
+  .output(MazePreviewSchema)
+  .handler(async ({ input }) => {
+    return createMazePreview(input.mazeSize)
+  })
+
 export const createGameProcedure = os
   .input(z.object({
     userId: z.string(),
-    mazeSize: z.number().min(7).max(51).default(15),
+    maze: MazePreviewSchema,
     maxTurns: z.number().min(10).max(1000).optional(),
     name: z.string().min(1).max(20),
     prompt: z.string().min(1).max(500),
@@ -165,7 +180,7 @@ export const createGameProcedure = os
   .output(z.object({ gameId: z.string() }))
   .handler(async ({ input }) => {
     const gameId = generateId()
-    const state = createGameState(input.mazeSize, input.maxTurns)
+    const state = createGameState(input.maze.maze.length, input.maxTurns, input.maze)
 
     gameStore.create(gameId, input.userId, input.name, input.prompt, state)
     broadcastList()
@@ -221,6 +236,7 @@ export const listGamesProcedure = os
 // Router
 export const router = {
   game: {
+    previewMaze: previewMazeProcedure,
     create: createGameProcedure,
     join: joinGameProcedure,
     get: getGameProcedure,

@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useCreateGame } from '../../hooks/useGame'
+import { useCreateGame, usePreviewMaze } from '../../hooks/useGame'
+import { MazePreviewRenderer } from '../../components/MazePreview'
 
 const MAZE_SIZES = [
   { value: 11, label: 'Small', desc: '11x11' },
@@ -33,18 +34,24 @@ const PRESET_STRATEGIES = [
 export default function NewGamePage() {
   const router = useRouter()
   const createGame = useCreateGame()
+  const { maze, loading: mazeLoading, generate } = usePreviewMaze()
 
   const [mazeSize, setMazeSize] = useState(15)
   const [playerName, setPlayerName] = useState('')
   const [playerPrompt, setPlayerPrompt] = useState('')
 
+  // Generate maze on mount and when size changes
+  useEffect(() => {
+    generate(mazeSize)
+  }, [mazeSize, generate])
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!playerPrompt.trim()) return
+    if (!playerPrompt.trim() || !maze) return
 
     const name = playerName.trim() || 'Player 1'
     const result = await createGame.mutateAsync({
-      mazeSize,
+      maze,
       name,
       prompt: playerPrompt.trim(),
     })
@@ -52,20 +59,32 @@ export default function NewGamePage() {
   }
 
   return (
-    <div className="max-w-xl mx-auto px-6 py-8">
+    <div className="max-w-4xl mx-auto px-6 py-8">
       <h2 className="text-2xl font-bold text-center mb-8">Create New Game</h2>
 
-      <form onSubmit={handleCreate} className="space-y-6">
-        {/* Maze Size */}
-        <div>
-          <label className="block text-sm text-zinc-400 mb-3">Maze Size</label>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Left: Maze Preview */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <label className="text-sm text-zinc-400">Maze Preview</label>
+            <button
+              type="button"
+              onClick={() => generate(mazeSize)}
+              disabled={mazeLoading}
+              className="text-sm text-emerald-400 hover:text-emerald-300 disabled:text-zinc-600"
+            >
+              {mazeLoading ? 'Generating...' : 'Regenerate'}
+            </button>
+          </div>
+
+          {/* Maze Size Selector */}
           <div className="grid grid-cols-4 gap-2">
             {MAZE_SIZES.map((size) => (
               <button
                 key={size.value}
                 type="button"
                 onClick={() => setMazeSize(size.value)}
-                className={`px-4 py-3 rounded-lg text-sm transition-colors ${
+                className={`px-3 py-2 rounded-lg text-sm transition-colors ${
                   mazeSize === size.value
                     ? 'bg-emerald-600 text-white'
                     : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
@@ -76,64 +95,82 @@ export default function NewGamePage() {
               </button>
             ))}
           </div>
+
+          {/* Maze Display */}
+          <div className="flex justify-center">
+            {maze ? (
+              <MazePreviewRenderer maze={maze} size="md" />
+            ) : (
+              <div className="w-64 h-64 bg-zinc-900 rounded-lg flex items-center justify-center">
+                <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
+          </div>
+
+          <p className="text-xs text-zinc-500 text-center">
+            S = Start (entrance) · E = Exit (goal)
+          </p>
         </div>
 
-        {/* Player Name */}
-        <div>
-          <label className="block text-sm text-zinc-400 mb-1">
-            Your Mouse Name <span className="text-zinc-600">(optional)</span>
-          </label>
-          <input
-            type="text"
-            value={playerName}
-            onChange={(e) => setPlayerName(e.target.value)}
-            placeholder="Player 1"
-            maxLength={20}
-            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-emerald-500"
-          />
-        </div>
+        {/* Right: Form */}
+        <form onSubmit={handleCreate} className="space-y-6">
+          {/* Player Name */}
+          <div>
+            <label className="block text-sm text-zinc-400 mb-1">
+              Your Mouse Name <span className="text-zinc-600">(optional)</span>
+            </label>
+            <input
+              type="text"
+              value={playerName}
+              onChange={(e) => setPlayerName(e.target.value)}
+              placeholder="Player 1"
+              maxLength={20}
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-emerald-500"
+            />
+          </div>
 
-        {/* Strategy Prompt */}
-        <div>
-          <label className="block text-sm text-zinc-400 mb-1">AI Strategy Prompt</label>
-          <textarea
-            value={playerPrompt}
-            onChange={(e) => setPlayerPrompt(e.target.value)}
-            placeholder="Describe how your AI mouse should navigate the maze..."
-            maxLength={500}
-            rows={4}
-            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-emerald-500 resize-none"
-          />
-          <div className="mt-2">
-            <span className="text-xs text-zinc-500">Or pick a preset:</span>
-            <div className="flex flex-wrap gap-2 mt-2">
-              {PRESET_STRATEGIES.map((strategy) => (
-                <button
-                  key={strategy.name}
-                  type="button"
-                  onClick={() => setPlayerPrompt(strategy.prompt)}
-                  className="px-3 py-1 text-xs bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-colors"
-                >
-                  {strategy.name}
-                </button>
-              ))}
+          {/* Strategy Prompt */}
+          <div>
+            <label className="block text-sm text-zinc-400 mb-1">AI Strategy Prompt</label>
+            <textarea
+              value={playerPrompt}
+              onChange={(e) => setPlayerPrompt(e.target.value)}
+              placeholder="Describe how your AI mouse should navigate the maze..."
+              maxLength={500}
+              rows={5}
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-emerald-500 resize-none"
+            />
+            <div className="mt-2">
+              <span className="text-xs text-zinc-500">Or pick a preset:</span>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {PRESET_STRATEGIES.map((strategy) => (
+                  <button
+                    key={strategy.name}
+                    type="button"
+                    onClick={() => setPlayerPrompt(strategy.prompt)}
+                    className="px-3 py-1 text-xs bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-colors"
+                  >
+                    {strategy.name}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Submit */}
-        <button
-          type="submit"
-          disabled={createGame.isPending || !playerPrompt.trim()}
-          className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 disabled:cursor-not-allowed text-white font-semibold py-4 px-8 rounded-xl transition-colors text-lg"
-        >
-          {createGame.isPending ? 'Creating...' : 'Create Game'}
-        </button>
+          {/* Submit */}
+          <button
+            type="submit"
+            disabled={createGame.isPending || !playerPrompt.trim() || !maze}
+            className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 disabled:cursor-not-allowed text-white font-semibold py-4 px-8 rounded-xl transition-colors text-lg"
+          >
+            {createGame.isPending ? 'Creating...' : 'Create Game'}
+          </button>
 
-        {createGame.error && (
-          <p className="text-red-400 text-sm text-center">{createGame.error.message}</p>
-        )}
-      </form>
+          {createGame.error && (
+            <p className="text-red-400 text-sm text-center">{createGame.error.message}</p>
+          )}
+        </form>
+      </div>
     </div>
   )
 }

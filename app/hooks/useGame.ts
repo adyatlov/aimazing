@@ -1,16 +1,40 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { client, getWebSocketUrl } from '../../api/client'
 import { useUserId } from '../contexts/UserContext'
 import type { GameResponse } from '../../api/client'
 
+export interface MazePreview {
+  maze: ('WALL' | 'PATH')[][]
+  entrance: { x: number; y: number }
+  exit: { x: number; y: number }
+}
+
+export function usePreviewMaze() {
+  const [maze, setMaze] = useState<MazePreview | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  const generate = useCallback(async (mazeSize: number) => {
+    setLoading(true)
+    try {
+      const result = await client.game.previewMaze({ mazeSize })
+      setMaze(result)
+      return result
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  return { maze, loading, generate }
+}
+
 export function useCreateGame() {
   const userId = useUserId()
   return useMutation({
     mutationFn: async (params: {
-      mazeSize?: number
+      maze: MazePreview
       maxTurns?: number
       name: string
       prompt: string
