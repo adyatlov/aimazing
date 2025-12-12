@@ -1,3 +1,4 @@
+import 'dotenv/config'
 import { createServer } from 'http'
 import { WebSocketServer, WebSocket } from 'ws'
 import { RPCHandler } from '@orpc/server/fetch'
@@ -76,6 +77,16 @@ const server = createServer(async (req, res) => {
 // WebSocket server
 const wss = new WebSocketServer({ server })
 
+wss.on('error', (err: NodeJS.ErrnoException) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`FATAL: Port ${PORT} is already in use!`)
+    console.error(`Kill the existing process or use a different port: PORT=3002 pnpm server`)
+  } else {
+    console.error(`FATAL: WebSocket server error:`, err.message)
+  }
+  process.exit(1)
+})
+
 wss.on('connection', (ws: WebSocket) => {
   console.log('WebSocket client connected')
   let subscribedGameId: string | null = null
@@ -118,6 +129,16 @@ wss.on('connection', (ws: WebSocket) => {
       ws.send(JSON.stringify({ type: 'gameUpdate', game }))
     }
   }
+})
+
+server.on('error', (err: NodeJS.ErrnoException) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`FATAL: Port ${PORT} is already in use!`)
+    console.error(`Kill the existing process or use a different port: PORT=3002 pnpm server`)
+  } else {
+    console.error(`FATAL: Server error:`, err.message)
+  }
+  process.exit(1)
 })
 
 server.listen(PORT, () => {
