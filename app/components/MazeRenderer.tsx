@@ -20,12 +20,7 @@ const PLAYER_BG = ['rgba(34, 197, 94, 0.2)', 'rgba(59, 130, 246, 0.2)']
 export function MazeRenderer({ game, size = 'md' }: MazeRendererProps) {
   const mazeSize = game.maze.length
 
-  const cellSizes = {
-    sm: Math.min(16, Math.floor(300 / mazeSize)),
-    md: Math.min(24, Math.floor(500 / mazeSize)),
-    lg: Math.min(32, Math.floor(700 / mazeSize)),
-  }
-  const cellSize = cellSizes[size]
+  const cellSize = 16
   const fontSize = size === 'sm' ? 'text-xs' : size === 'md' ? 'text-sm' : 'text-base'
 
   return (

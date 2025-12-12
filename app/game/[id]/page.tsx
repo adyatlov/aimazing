@@ -158,50 +158,11 @@ export default function GamePage() {
         </div>
       </div>
 
-      {/* Player Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        {/* Creator card */}
-        {creator && (
-          <div className={`p-4 rounded-xl border ${
-            game.status === 'CREATOR_WIN' ? 'bg-emerald-900/20 border-emerald-600' :
-            'bg-zinc-900/50 border-zinc-800'
-          }`}>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="w-3 h-3 rounded-full bg-green-500" />
-              <span className="font-semibold">{creator.name}</span>
-              {isPlayer && game.myPrompt && <span className="text-xs text-emerald-400">(You)</span>}
-            </div>
-            {isPlayer && game.myPrompt ? (
-              <p className="text-xs text-zinc-400 line-clamp-2 mb-3">{game.myPrompt}</p>
-            ) : (
-              <p className="text-xs text-zinc-600 italic mb-3">Strategy hidden</p>
-            )}
-            <div className="flex items-center gap-4 text-xs text-zinc-500">
-              <span>Pos: ({creator.position.x}, {creator.position.y})</span>
-              <span>Facing: {creator.facing}</span>
-            </div>
-          </div>
-        )}
-
-        {/* Opponent card or waiting/join */}
-        {opponent ? (
-          <div className={`p-4 rounded-xl border ${
-            game.status === 'OPPONENT_WIN' ? 'bg-emerald-900/20 border-emerald-600' :
-            'bg-zinc-900/50 border-zinc-800'
-          }`}>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="w-3 h-3 rounded-full bg-blue-500" />
-              <span className="font-semibold">{opponent.name}</span>
-            </div>
-            <p className="text-xs text-zinc-600 italic mb-3">Strategy hidden</p>
-            <div className="flex items-center gap-4 text-xs text-zinc-500">
-              <span>Pos: ({opponent.position.x}, {opponent.position.y})</span>
-              <span>Facing: {opponent.facing}</span>
-            </div>
-          </div>
-        ) : canJoin ? (
+      {/* Join Form - shown alone when joining */}
+      {canJoin && (
+        <div className="max-w-md mx-auto mb-6">
           <StrategyForm
-            title="Join Game"
+            title="Your Mouse"
             name={playerName}
             setName={setPlayerName}
             prompt={prompt}
@@ -212,13 +173,59 @@ export default function GamePage() {
             error={joinGame.error?.message}
             namePlaceholder="Player 2"
           />
-        ) : isPlayer ? (
-          <div className="p-4 rounded-xl border border-dashed border-zinc-700 bg-zinc-900/30 flex flex-col items-center justify-center text-center">
-            <p className="text-zinc-400 mb-3">Waiting for opponent...</p>
-            <ShareLink gameId={gameId} />
-          </div>
-        ) : null}
-      </div>
+        </div>
+      )}
+
+      {/* Player Cards - shown during game or waiting */}
+      {!canJoin && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          {/* Creator card */}
+          {creator && (
+            <div className={`p-4 rounded-xl border ${
+              game.status === 'CREATOR_WIN' ? 'bg-emerald-900/20 border-emerald-600' :
+              'bg-zinc-900/50 border-zinc-800'
+            }`}>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="w-3 h-3 rounded-full bg-green-500" />
+                <span className="font-semibold">{creator.name}</span>
+                {isPlayer && game.myPrompt && <span className="text-xs text-emerald-400">(You)</span>}
+              </div>
+              {isPlayer && game.myPrompt ? (
+                <p className="text-xs text-zinc-400 line-clamp-2 mb-3">{game.myPrompt}</p>
+              ) : (
+                <p className="text-xs text-zinc-600 italic mb-3">Strategy hidden</p>
+              )}
+              <div className="flex items-center gap-4 text-xs text-zinc-500">
+                <span>Pos: ({creator.position.x}, {creator.position.y})</span>
+                <span>Facing: {creator.facing}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Opponent card or waiting */}
+          {opponent ? (
+            <div className={`p-4 rounded-xl border ${
+              game.status === 'OPPONENT_WIN' ? 'bg-emerald-900/20 border-emerald-600' :
+              'bg-zinc-900/50 border-zinc-800'
+            }`}>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="w-3 h-3 rounded-full bg-blue-500" />
+                <span className="font-semibold">{opponent.name}</span>
+              </div>
+              <p className="text-xs text-zinc-600 italic mb-3">Strategy hidden</p>
+              <div className="flex items-center gap-4 text-xs text-zinc-500">
+                <span>Pos: ({opponent.position.x}, {opponent.position.y})</span>
+                <span>Facing: {opponent.facing}</span>
+              </div>
+            </div>
+          ) : isPlayer ? (
+            <div className="p-4 rounded-xl border border-dashed border-zinc-700 bg-zinc-900/30 flex flex-col items-center justify-center text-center">
+              <p className="text-zinc-400 mb-3">Waiting for opponent...</p>
+              <ShareLink gameId={gameId} />
+            </div>
+          ) : null}
+        </div>
+      )}
 
       {/* Result Banner */}
       {finished && (

@@ -80,19 +80,18 @@ export default function NewGamePage() {
       {/* Maze */}
       <div className="flex justify-center mb-6">
         <div className="bg-zinc-900/30 rounded-xl p-4 border border-zinc-800">
-          {maze ? (
-            <MazePreviewRenderer maze={maze} size="lg" />
-          ) : (
-            <div className="w-[400px] h-[400px] flex items-center justify-center">
+          <div className="w-[500px] h-[500px] flex items-center justify-center">
+            {maze ? (
+              <MazePreviewRenderer maze={maze} size="lg" />
+            ) : (
               <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Player Setup */}
+      {/* Player Setup Card */}
+      <div className="max-w-md mx-auto">
         <StrategyForm
           title="Your Mouse"
           name={playerName}
@@ -105,22 +104,6 @@ export default function NewGamePage() {
           error={createGame.error?.message}
           namePlaceholder="Player 1"
         />
-
-        {/* Instructions */}
-        <div className="p-4 rounded-xl border border-dashed border-zinc-700 bg-zinc-900/30 flex flex-col justify-center">
-          <h3 className="font-semibold mb-2 text-zinc-400">How to Play</h3>
-          <ul className="text-xs text-zinc-500 space-y-1.5">
-            <li>• Choose a maze size and regenerate until you like it</li>
-            <li>• Write a strategy prompt for your AI mouse</li>
-            <li>• Share the game link with a friend to challenge them</li>
-            <li>• First mouse to reach the exit wins!</li>
-          </ul>
-          <div className="mt-4 pt-3 border-t border-zinc-800">
-            <p className="text-xs text-zinc-600">
-              <span className="text-yellow-500">S</span> = Start · <span className="text-emerald-400">E</span> = Exit
-            </p>
-          </div>
-        </div>
       </div>
     </div>
   )
