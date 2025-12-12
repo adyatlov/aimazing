@@ -1,15 +1,13 @@
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
 import type { RouterClient } from '@orpc/server'
-import type { Router } from './router'
+import type { Router } from '../server/router'
+
+// Server URL - configured via environment variable
+const SERVER_URL = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001'
 
 const link = new RPCLink({
-  url: () => {
-    if (typeof window !== 'undefined') {
-      return `${window.location.origin}/rpc`
-    }
-    return `http://localhost:${process.env.PORT || 3000}/rpc`
-  },
+  url: () => `${SERVER_URL}/rpc`,
   headers: () => ({
     'Content-Type': 'application/json',
   }),
@@ -17,4 +15,12 @@ const link = new RPCLink({
 
 export const client: RouterClient<Router> = createORPCClient(link)
 
+// WebSocket URL for real-time updates
+export function getWebSocketUrl(): string {
+  const url = new URL(SERVER_URL)
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+  return url.toString()
+}
+
 export type { Router }
+export type { SerializedGame } from '../server/router'

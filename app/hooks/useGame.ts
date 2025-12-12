@@ -1,8 +1,9 @@
 'use client'
 
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { client } from '../../api/client'
-import type { SerializedGame } from '../../api/router'
+import { client, getWebSocketUrl } from '../../api/client'
+import type { SerializedGame } from '../../api/client'
 
 export function useCreateGame() {
   const queryClient = useQueryClient()
@@ -45,26 +46,69 @@ export function useStartGame() {
 }
 
 export function useGame(gameId: string | null) {
-  return useQuery({
+  const queryClient = useQueryClient()
+  const wsRef = useRef<WebSocket | null>(null)
+  const [wsConnected, setWsConnected] = useState(false)
+
+  // Initial fetch
+  const query = useQuery({
     queryKey: ['game', gameId],
     queryFn: async () => {
       if (!gameId) throw new Error('No game ID')
       return client.game.get({ gameId })
     },
     enabled: !!gameId,
-    refetchInterval: (query) => {
-      const data = query.state.data as SerializedGame | undefined
-      // Poll faster during gameplay, stop when finished
-      if (data?.status === 'PLAYING') {
-        return 300 // Poll every 300ms during gameplay
-      }
-      if (data?.status === 'FINISHED') {
-        return false // Stop polling when finished
-      }
-      return 1000 // Poll every second while waiting
-    },
-    staleTime: 100,
+    staleTime: Infinity, // WebSocket will handle updates
   })
+
+  // WebSocket connection for real-time updates
+  useEffect(() => {
+    if (!gameId) return
+
+    const wsUrl = getWebSocketUrl()
+    const ws = new WebSocket(wsUrl)
+    wsRef.current = ws
+
+    ws.onopen = () => {
+      setWsConnected(true)
+      // Subscribe to game updates
+      ws.send(JSON.stringify({ type: 'subscribe', gameId }))
+    }
+
+    ws.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data)
+        if (message.type === 'gameUpdate' && message.game) {
+          // Update the query cache with new game state
+          queryClient.setQueryData(['game', gameId], message.game)
+        }
+      } catch (e) {
+        console.error('Failed to parse WebSocket message:', e)
+      }
+    }
+
+    ws.onclose = () => {
+      setWsConnected(false)
+    }
+
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error)
+      setWsConnected(false)
+    }
+
+    return () => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'unsubscribe' }))
+      }
+      ws.close()
+      wsRef.current = null
+    }
+  }, [gameId, queryClient])
+
+  return {
+    ...query,
+    wsConnected,
+  }
 }
 
 export function useGamesList() {
@@ -74,3 +118,5 @@ export function useGamesList() {
     refetchInterval: 5000,
   })
 }
+
+export type { SerializedGame }

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { runGameWithMockAI, PlayerConfig, GameConfig } from '../lib/game-loop'
-import { Game, MouseAction } from '../lib/types'
-import { hasPath } from '../lib/maze'
+import { runGameWithMockAI, PlayerConfig, GameConfig } from '../server/lib/game-loop'
+import { Game, MouseAction } from '../server/lib/types'
+import { hasPath } from '../server/lib/maze'
 
 describe('runGameWithMockAI', () => {
   const player1: PlayerConfig = { name: 'Mouse 1', prompt: 'Go right' }

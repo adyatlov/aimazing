@@ -1,6 +1,6 @@
 'use client'
 
-import type { SerializedGame } from '../../api/router'
+import type { SerializedGame } from '../../api/client'
 
 interface MazeRendererProps {
   game: SerializedGame

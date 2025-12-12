@@ -9,7 +9,7 @@ interface GameViewProps {
 }
 
 export function GameView({ gameId, onNewGame }: GameViewProps) {
-  const { data: game, isLoading, error } = useGame(gameId)
+  const { data: game, isLoading, error, wsConnected } = useGame(gameId)
 
   if (isLoading && !game) {
     return (
@@ -45,9 +45,15 @@ export function GameView({ gameId, onNewGame }: GameViewProps) {
         <div className="flex items-center gap-4">
           <h1 className="text-3xl font-bold">AI Maze Battle</h1>
           {isPlaying && (
-            <span className="flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-900/50 text-emerald-400 text-sm">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              Live
+            <span className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm ${
+              wsConnected
+                ? 'bg-emerald-900/50 text-emerald-400'
+                : 'bg-yellow-900/50 text-yellow-400'
+            }`}>
+              <span className={`w-2 h-2 rounded-full animate-pulse ${
+                wsConnected ? 'bg-emerald-400' : 'bg-yellow-400'
+              }`} />
+              {wsConnected ? 'Live' : 'Connecting...'}
             </span>
           )}
         </div>

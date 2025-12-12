@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { generateMaze, hasPath, findPath, manhattanDistance, mazeToAscii } from '../lib/maze'
+import { generateMaze, hasPath, findPath, manhattanDistance, mazeToAscii } from '../server/lib/maze'
 
 describe('generateMaze', () => {
   it('should generate a maze of correct size', () => {

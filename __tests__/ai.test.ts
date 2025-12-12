@@ -4,8 +4,8 @@ import {
   buildMemoryMap,
   buildUserPrompt,
   formatVision,
-} from '../lib/ai'
-import { VisibleState, CellType, Facing } from '../lib/types'
+} from '../server/lib/ai'
+import { VisibleState, CellType, Facing } from '../server/lib/types'
 
 function createTestVisibleState(facing: Facing = 'EAST'): VisibleState {
   const exploredCells = new Map<string, CellType>([

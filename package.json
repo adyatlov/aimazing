@@ -6,6 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "server": "tsx server/index.ts",
+    "server:watch": "tsx watch server/index.ts",
     "lint": "eslint",
     "test": "vitest",
     "test:run": "vitest run",
@@ -36,6 +38,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.0.10",
     "tailwindcss": "^4",
+    "tsx": "^4.21.0",
     "typescript": "^5"
   }
 }

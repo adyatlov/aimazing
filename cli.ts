@@ -2,10 +2,10 @@
 
 import 'dotenv/config'
 import logUpdate from 'log-update'
-import { runGame, formatAction, TurnInfo } from './lib/game-loop'
-import { Game } from './lib/types'
-import { facingToArrow } from './lib/game'
-import { buildMemoryMap, formatVision, buildVisionResult } from './lib/ai'
+import { runGame, formatAction, TurnInfo } from './server/lib/game-loop'
+import { Game } from './server/lib/types'
+import { facingToArrow } from './server/lib/game'
+import { buildMemoryMap, formatVision, buildVisionResult } from './server/lib/ai'
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))

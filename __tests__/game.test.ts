@@ -12,8 +12,8 @@ import {
   turnRight,
   getPositionInFront,
   facingToArrow,
-} from '../lib/game'
-import { Maze, Position, Game, MouseAction } from '../lib/types'
+} from '../server/lib/game'
+import { Maze, Position, Game, MouseAction } from '../server/lib/types'
 
 // Helper to create a simple test maze
 function createTestMaze(): { maze: Maze; entrance: Position; exit: Position } {

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useCreateGame, useJoinGame, useStartGame } from '../hooks/useGame'
 import { MazeRenderer } from './MazeRenderer'
-import type { SerializedGame } from '../../api/router'
+import type { SerializedGame } from '../../api/client'
 
 interface GameSetupProps {
   onGameReady: (gameId: string) => void

@@ -1,8 +1,8 @@
 import { os } from '@orpc/server'
 import { z } from 'zod'
-import { createGame, addPlayer, getMouseVision, executeTurn, facingToArrow } from '../lib/game'
-import { getActions } from '../lib/ai'
-import type { Game, GameResult, GameStatus, MouseAction, Position, Facing, CellType } from '../lib/types'
+import { createGame, addPlayer, getMouseVision, executeTurn, facingToArrow } from './lib/game'
+import { getActions } from './lib/ai'
+import type { Game, GameResult, GameStatus, MouseAction, Position, Facing, CellType } from './lib/types'
 
 // Serializable game state (Maps and Sets converted to arrays/objects)
 export const PositionSchema = z.object({
@@ -56,10 +56,29 @@ interface GameSession {
   game: Game
   id: string
   subscribers: Set<(update: TurnUpdate) => void>
+  wsSubscribers: Set<(game: SerializedGame) => void>
   isRunning: boolean
 }
 
 const games = new Map<string, GameSession>()
+
+// WebSocket subscription helpers
+export function subscribeToGame(gameId: string, callback: (game: SerializedGame) => void): boolean {
+  const session = games.get(gameId)
+  if (!session) return false
+
+  session.wsSubscribers.add(callback)
+  // Send current state immediately
+  callback(serializeGame(session.game, gameId))
+  return true
+}
+
+export function unsubscribeFromGame(gameId: string, callback: (game: SerializedGame) => void): void {
+  const session = games.get(gameId)
+  if (session) {
+    session.wsSubscribers.delete(callback)
+  }
+}
 
 function generateId(): string {
   return Math.random().toString(36).substring(2, 9)
@@ -107,6 +126,7 @@ export const createGameProcedure = os
       game,
       id,
       subscribers: new Set(),
+      wsSubscribers: new Set(),
       isRunning: false,
     })
 
@@ -212,6 +232,25 @@ async function runGameLoop(session: GameSession): Promise<void> {
         // Remove failed subscriber
         session.subscribers.delete(callback)
       }
+    }
+
+    // Notify WebSocket subscribers
+    for (const callback of session.wsSubscribers) {
+      try {
+        callback(update.game)
+      } catch (e) {
+        session.wsSubscribers.delete(callback)
+      }
+    }
+  }
+
+  // Send final state to WebSocket subscribers
+  const finalState = serializeGame(session.game, session.id)
+  for (const callback of session.wsSubscribers) {
+    try {
+      callback(finalState)
+    } catch (e) {
+      session.wsSubscribers.delete(callback)
     }
   }
 
