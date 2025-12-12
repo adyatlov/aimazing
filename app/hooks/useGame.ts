@@ -1,35 +1,32 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { client, getWebSocketUrl } from '../../api/client'
-import type { SerializedGame } from '../../api/client'
+import type { GameResponse } from '../../api/client'
 
-// Cookie helpers
-function getCookie(name: string): string | null {
-  if (typeof document === 'undefined') return null
-  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'))
-  return match ? decodeURIComponent(match[2]) : null
+// Store playerId for each game in localStorage
+export function getPlayerId(gameId: string): string | null {
+  if (typeof window === 'undefined') return null
+  return localStorage.getItem(`player_${gameId}`)
 }
 
-function setCookie(name: string, value: string, days: number = 30) {
-  if (typeof document === 'undefined') return
-  const expires = new Date(Date.now() + days * 864e5).toUTCString()
-  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`
-}
-
-export function getPlayerSecret(gameId: string): string | null {
-  return getCookie(`player_${gameId}`)
-}
-
-export function setPlayerSecret(gameId: string, secret: string) {
-  setCookie(`player_${gameId}`, secret)
+export function setPlayerId(gameId: string, playerId: string) {
+  if (typeof window === 'undefined') return
+  localStorage.setItem(`player_${gameId}`, playerId)
 }
 
 export function useCreateGame() {
   return useMutation({
-    mutationFn: async (params: { mazeSize?: number; maxTurns?: number }) => {
-      return client.game.create(params)
+    mutationFn: async (params: {
+      mazeSize?: number
+      maxTurns?: number
+      name: string
+      prompt: string
+    }) => {
+      const result = await client.game.create(params)
+      setPlayerId(result.gameId, result.playerId)
+      return result
     },
   })
 }
@@ -38,23 +35,24 @@ export function useJoinGame() {
   return useMutation({
     mutationFn: async (params: { gameId: string; name: string; prompt: string }) => {
       const result = await client.game.join(params)
-      // Store player secret in cookie
-      setPlayerSecret(params.gameId, result.playerSecret)
+      setPlayerId(params.gameId, result.playerId)
       return result
     },
   })
 }
 
 export function useGame(gameId: string | null) {
-  const [game, setGame] = useState<SerializedGame | null>(null)
+  const [game, setGame] = useState<GameResponse | null>(null)
   const [connected, setConnected] = useState(false)
   const [error, setError] = useState<Error | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
 
+  // Get playerId for this game (if we're a player)
+  const playerId = gameId ? getPlayerId(gameId) : null
+
   useEffect(() => {
     if (!gameId) return
 
-    const playerSecret = getPlayerSecret(gameId)
     const wsUrl = getWebSocketUrl()
     const ws = new WebSocket(wsUrl)
     wsRef.current = ws
@@ -64,7 +62,7 @@ export function useGame(gameId: string | null) {
       ws.send(JSON.stringify({
         type: 'subscribeGame',
         gameId,
-        playerSecret,
+        playerId,
       }))
     }
 
@@ -74,6 +72,9 @@ export function useGame(gameId: string | null) {
         if (message.type === 'gameUpdate' && message.game) {
           setGame(message.game)
           setError(null)
+        } else if (message.type === 'gameNotFound') {
+          setError(new Error('Game not found'))
+          setGame(null)
         }
       } catch (e) {
         console.error('Failed to parse WebSocket message:', e)
@@ -96,19 +97,18 @@ export function useGame(gameId: string | null) {
       ws.close()
       wsRef.current = null
     }
-  }, [gameId])
+  }, [gameId, playerId])
 
-  // Check if current user is a player in this game
-  const playerSecret = gameId ? getPlayerSecret(gameId) : null
-  const isPlayer = game?.players.some(p => p.prompt !== undefined) ?? false
+  // Check if current user is a player (their prompt is visible)
+  const isPlayer = game?.myPrompt !== undefined
 
   return {
     game,
     connected,
     error,
     isPlayer,
-    playerSecret,
+    playerId,
   }
 }
 
-export type { SerializedGame }
+export type { GameResponse }

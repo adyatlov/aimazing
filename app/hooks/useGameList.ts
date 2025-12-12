@@ -23,11 +23,11 @@ export function useGameList(includeFinished: boolean = false) {
       try {
         const message = JSON.parse(event.data)
         if (message.type === 'gameList' && message.games) {
-          let filteredGames = message.games as GameListItem[]
+          let gameList = message.games as GameListItem[]
           if (!includeFinished) {
-            filteredGames = filteredGames.filter(g => g.status !== 'FINISHED')
+            gameList = gameList.filter(g => g.status === 'WAITING' || g.status === 'PLAYING')
           }
-          setGames(filteredGames)
+          setGames(gameList)
         }
       } catch (e) {
         console.error('Failed to parse WebSocket message:', e)
@@ -47,6 +47,7 @@ export function useGameList(includeFinished: boolean = false) {
         ws.send(JSON.stringify({ type: 'unsubscribeList' }))
       }
       ws.close()
+      wsRef.current = null
     }
   }, [includeFinished])
 

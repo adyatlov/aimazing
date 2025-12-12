@@ -1,9 +1,9 @@
 'use client'
 
-import type { SerializedGame } from '../../api/client'
+import type { GameResponse } from '../../api/client'
 
 interface MazeRendererProps {
-  game: SerializedGame
+  game: GameResponse
   size?: 'sm' | 'md' | 'lg'
 }
 
@@ -44,9 +44,9 @@ export function MazeRenderer({ game, size = 'md' }: MazeRendererProps) {
 
           // Check for mice (both could be on same cell)
           const miceHere: number[] = []
-          for (let i = 0; i < game.players.length; i++) {
-            const player = game.players[i]
-            if (player.mouse.position.x === x && player.mouse.position.y === y) {
+          for (let i = 0; i < game.mice.length; i++) {
+            const mouse = game.mice[i]
+            if (mouse.position.x === x && mouse.position.y === y) {
               miceHere.push(i)
             }
           }
@@ -70,7 +70,7 @@ export function MazeRenderer({ game, size = 'md' }: MazeRendererProps) {
                 <span className="text-purple-400">X</span>
               ) : miceHere.length === 1 ? (
                 <span style={{ color: PLAYER_COLORS[miceHere[0]] }}>
-                  {FACING_ARROWS[game.players[miceHere[0]].mouse.facing]}
+                  {FACING_ARROWS[game.mice[miceHere[0]].facing]}
                 </span>
               ) : isEntrance ? (
                 <span className="text-yellow-500/80">S</span>
