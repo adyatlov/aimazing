@@ -1,10 +1,11 @@
 import { os } from '@orpc/server'
 import { z } from 'zod'
-import { createGame, addPlayer, getMouseVision, executeTurn, facingToArrow } from './lib/game'
+import { createGame, addPlayer, getMouseVision, executeTurn } from './lib/game'
 import { getActions } from './lib/ai'
-import type { Game, GameResult, GameStatus, MouseAction, Position, Facing, CellType } from './lib/types'
+import type { Game } from './lib/types'
+import { randomUUID } from 'crypto'
 
-// Serializable game state (Maps and Sets converted to arrays/objects)
+// Schemas
 export const PositionSchema = z.object({
   x: z.number(),
   y: z.number(),
@@ -25,7 +26,7 @@ export const SerializedMouseSchema = z.object({
 export const SerializedPlayerSchema = z.object({
   id: z.string(),
   name: z.string(),
-  prompt: z.string(),
+  prompt: z.string().optional(), // Optional - hidden from opponents
   mouse: SerializedMouseSchema,
 })
 
@@ -41,50 +42,42 @@ export const SerializedGameSchema = z.object({
   result: z.enum(['PLAYER1_WIN', 'PLAYER2_WIN', 'DRAW']).nullable(),
 })
 
-export const TurnUpdateSchema = z.object({
+export const GameListItemSchema = z.object({
+  id: z.string(),
+  status: z.enum(['WAITING', 'PLAYING', 'FINISHED']),
+  playerCount: z.number(),
+  playerNames: z.array(z.string()),
   turn: z.number(),
-  game: SerializedGameSchema,
-  actions: z.tuple([MouseActionSchema, MouseActionSchema]),
-  toolCalls: z.tuple([z.array(z.string()), z.array(z.string())]),
+  maxTurns: z.number(),
+  result: z.enum(['PLAYER1_WIN', 'PLAYER2_WIN', 'DRAW']).nullable(),
 })
 
 export type SerializedGame = z.infer<typeof SerializedGameSchema>
-export type TurnUpdate = z.infer<typeof TurnUpdateSchema>
+export type GameListItem = z.infer<typeof GameListItemSchema>
 
 // In-memory game store
 interface GameSession {
   game: Game
   id: string
-  subscribers: Set<(update: TurnUpdate) => void>
-  wsSubscribers: Set<(game: SerializedGame) => void>
+  playerSecrets: Map<string, string> // playerId -> secret token
+  gameSubscribers: Set<(game: SerializedGame) => void>
   isRunning: boolean
 }
 
 const games = new Map<string, GameSession>()
+const gameListSubscribers = new Set<(games: GameListItem[]) => void>()
 
-// WebSocket subscription helpers
-export function subscribeToGame(gameId: string, callback: (game: SerializedGame) => void): boolean {
-  const session = games.get(gameId)
-  if (!session) return false
-
-  session.wsSubscribers.add(callback)
-  // Send current state immediately
-  callback(serializeGame(session.game, gameId))
-  return true
+// Generate IDs
+function generateGameId(): string {
+  return randomUUID().substring(0, 8)
 }
 
-export function unsubscribeFromGame(gameId: string, callback: (game: SerializedGame) => void): void {
-  const session = games.get(gameId)
-  if (session) {
-    session.wsSubscribers.delete(callback)
-  }
+function generatePlayerSecret(): string {
+  return randomUUID()
 }
 
-function generateId(): string {
-  return Math.random().toString(36).substring(2, 9)
-}
-
-function serializeGame(game: Game, id: string): SerializedGame {
+// Serialize game for a specific viewer (hides opponent prompts)
+function serializeGame(game: Game, id: string, viewerPlayerId?: string): SerializedGame {
   return {
     id,
     maze: game.maze,
@@ -93,7 +86,8 @@ function serializeGame(game: Game, id: string): SerializedGame {
     players: game.players.map(p => ({
       id: p.id,
       name: p.name,
-      prompt: p.prompt,
+      // Only show prompt to the player who owns it
+      prompt: viewerPlayerId === p.id ? p.prompt : undefined,
       mouse: {
         position: p.mouse.position,
         facing: p.mouse.facing,
@@ -108,38 +102,112 @@ function serializeGame(game: Game, id: string): SerializedGame {
   }
 }
 
+function serializeGameListItem(session: GameSession): GameListItem {
+  return {
+    id: session.id,
+    status: session.game.status,
+    playerCount: session.game.players.length,
+    playerNames: session.game.players.map(p => p.name),
+    turn: session.game.turn,
+    maxTurns: session.game.maxTurns,
+    result: session.game.result,
+  }
+}
+
+function getGameList(): GameListItem[] {
+  return Array.from(games.values()).map(serializeGameListItem)
+}
+
+function broadcastGameList() {
+  const list = getGameList()
+  for (const callback of gameListSubscribers) {
+    try {
+      callback(list)
+    } catch {
+      gameListSubscribers.delete(callback)
+    }
+  }
+}
+
+// WebSocket subscription helpers
+export function subscribeToGameList(callback: (games: GameListItem[]) => void): void {
+  gameListSubscribers.add(callback)
+  callback(getGameList())
+}
+
+export function unsubscribeFromGameList(callback: (games: GameListItem[]) => void): void {
+  gameListSubscribers.delete(callback)
+}
+
+export function subscribeToGame(gameId: string, callback: (game: SerializedGame) => void, playerSecret?: string): boolean {
+  const session = games.get(gameId)
+  if (!session) return false
+
+  // Find player ID from secret
+  let viewerPlayerId: string | undefined
+  if (playerSecret) {
+    for (const [playerId, secret] of session.playerSecrets) {
+      if (secret === playerSecret) {
+        viewerPlayerId = playerId
+        break
+      }
+    }
+  }
+
+  // Wrap callback to include player filtering
+  const wrappedCallback = (game: SerializedGame) => {
+    callback(serializeGame(session.game, gameId, viewerPlayerId))
+  }
+
+  session.gameSubscribers.add(wrappedCallback)
+  wrappedCallback(serializeGame(session.game, gameId, viewerPlayerId))
+  return true
+}
+
+export function unsubscribeFromGame(gameId: string, callback: (game: SerializedGame) => void): void {
+  const session = games.get(gameId)
+  if (session) {
+    session.gameSubscribers.delete(callback)
+  }
+}
+
 // oRPC procedures
 export const createGameProcedure = os
   .input(z.object({
     mazeSize: z.number().min(7).max(51).optional().default(15),
     maxTurns: z.number().min(10).max(1000).optional(),
   }))
-  .output(SerializedGameSchema)
+  .output(z.object({ gameId: z.string() }))
   .handler(async ({ input }) => {
     const { mazeSize, maxTurns } = input
     const actualMaxTurns = maxTurns ?? Math.floor(mazeSize * mazeSize / 2)
 
     const game = createGame(mazeSize, actualMaxTurns)
-    const id = generateId()
+    const id = generateGameId()
 
     games.set(id, {
       game,
       id,
-      subscribers: new Set(),
-      wsSubscribers: new Set(),
+      playerSecrets: new Map(),
+      gameSubscribers: new Set(),
       isRunning: false,
     })
 
-    return serializeGame(game, id)
+    broadcastGameList()
+    return { gameId: id }
   })
 
 export const joinGameProcedure = os
   .input(z.object({
     gameId: z.string(),
-    name: z.string(),
-    prompt: z.string(),
+    name: z.string().min(1).max(20),
+    prompt: z.string().min(1).max(500),
   }))
-  .output(SerializedGameSchema)
+  .output(z.object({
+    playerSecret: z.string(),
+    playerId: z.string(),
+    game: SerializedGameSchema,
+  }))
   .handler(async ({ input }) => {
     const { gameId, name, prompt } = input
     const session = games.get(gameId)
@@ -152,14 +220,35 @@ export const joinGameProcedure = os
       throw new Error('Game already has 2 players')
     }
 
-    session.game = addPlayer(session.game, name, prompt)
+    if (session.game.status !== 'WAITING') {
+      throw new Error('Game already started')
+    }
 
-    return serializeGame(session.game, gameId)
+    session.game = addPlayer(session.game, name, prompt)
+    const playerId = session.game.players[session.game.players.length - 1].id
+    const playerSecret = generatePlayerSecret()
+    session.playerSecrets.set(playerId, playerSecret)
+
+    broadcastGameList()
+    broadcastGameUpdate(session)
+
+    // Auto-start when 2 players joined
+    if (session.game.players.length === 2 && session.game.status === 'PLAYING' && !session.isRunning) {
+      session.isRunning = true
+      runGameLoop(session).catch(console.error)
+    }
+
+    return {
+      playerSecret,
+      playerId,
+      game: serializeGame(session.game, gameId, playerId),
+    }
   })
 
 export const getGameProcedure = os
   .input(z.object({
     gameId: z.string(),
+    playerSecret: z.string().optional(),
   }))
   .output(SerializedGameSchema)
   .handler(async ({ input }) => {
@@ -169,36 +258,43 @@ export const getGameProcedure = os
       throw new Error('Game not found')
     }
 
-    return serializeGame(session.game, input.gameId)
+    // Find player ID from secret
+    let viewerPlayerId: string | undefined
+    if (input.playerSecret) {
+      for (const [playerId, secret] of session.playerSecrets) {
+        if (secret === input.playerSecret) {
+          viewerPlayerId = playerId
+          break
+        }
+      }
+    }
+
+    return serializeGame(session.game, input.gameId, viewerPlayerId)
   })
 
-export const startGameProcedure = os
+export const listGamesProcedure = os
   .input(z.object({
-    gameId: z.string(),
+    includeFinished: z.boolean().optional().default(false),
   }))
-  .output(z.object({ started: z.boolean() }))
+  .output(z.array(GameListItemSchema))
   .handler(async ({ input }) => {
-    const session = games.get(input.gameId)
-
-    if (!session) {
-      throw new Error('Game not found')
+    let list = getGameList()
+    if (!input.includeFinished) {
+      list = list.filter(g => g.status !== 'FINISHED')
     }
-
-    if (session.game.status !== 'PLAYING') {
-      throw new Error('Game is not ready to start (need 2 players)')
-    }
-
-    if (session.isRunning) {
-      return { started: false }
-    }
-
-    session.isRunning = true
-
-    // Run game loop in background
-    runGameLoop(session).catch(console.error)
-
-    return { started: true }
+    return list
   })
+
+function broadcastGameUpdate(session: GameSession) {
+  const game = serializeGame(session.game, session.id)
+  for (const callback of session.gameSubscribers) {
+    try {
+      callback(game)
+    } catch {
+      session.gameSubscribers.delete(callback)
+    }
+  }
+}
 
 async function runGameLoop(session: GameSession): Promise<void> {
   const mazeSize = session.game.maze.length
@@ -217,102 +313,15 @@ async function runGameLoop(session: GameSession): Promise<void> {
 
     session.game = executeTurn(session.game, aiResults.actions)
 
-    const update: TurnUpdate = {
-      turn: session.game.turn,
-      game: serializeGame(session.game, session.id),
-      actions: aiResults.actions,
-      toolCalls: [aiResults.results[0].toolCalls, aiResults.results[1].toolCalls],
-    }
-
-    // Notify all subscribers
-    for (const callback of session.subscribers) {
-      try {
-        callback(update)
-      } catch (e) {
-        // Remove failed subscriber
-        session.subscribers.delete(callback)
-      }
-    }
-
-    // Notify WebSocket subscribers
-    for (const callback of session.wsSubscribers) {
-      try {
-        callback(update.game)
-      } catch (e) {
-        session.wsSubscribers.delete(callback)
-      }
-    }
+    broadcastGameUpdate(session)
+    broadcastGameList()
   }
 
-  // Send final state to WebSocket subscribers
-  const finalState = serializeGame(session.game, session.id)
-  for (const callback of session.wsSubscribers) {
-    try {
-      callback(finalState)
-    } catch (e) {
-      session.wsSubscribers.delete(callback)
-    }
-  }
-
+  // Final broadcast
+  broadcastGameUpdate(session)
+  broadcastGameList()
   session.isRunning = false
 }
-
-// Streaming subscription for game updates
-export const watchGameProcedure = os
-  .input(z.object({
-    gameId: z.string(),
-  }))
-  .handler(async function* ({ input, signal }) {
-    const session = games.get(input.gameId)
-
-    if (!session) {
-      throw new Error('Game not found')
-    }
-
-    // Send current state first
-    yield serializeGame(session.game, input.gameId)
-
-    // Create a queue for updates
-    const updates: TurnUpdate[] = []
-    let resolve: (() => void) | null = null
-
-    const callback = (update: TurnUpdate) => {
-      updates.push(update)
-      if (resolve) {
-        resolve()
-        resolve = null
-      }
-    }
-
-    session.subscribers.add(callback)
-
-    try {
-      while (!signal?.aborted && session.game.status !== 'FINISHED') {
-        if (updates.length === 0) {
-          // Wait for next update
-          await new Promise<void>(r => { resolve = r })
-        }
-
-        while (updates.length > 0) {
-          const update = updates.shift()!
-          yield update.game
-        }
-      }
-
-      // Send final state
-      yield serializeGame(session.game, input.gameId)
-    } finally {
-      session.subscribers.delete(callback)
-    }
-  })
-
-export const listGamesProcedure = os
-  .output(z.array(SerializedGameSchema))
-  .handler(async () => {
-    return Array.from(games.entries()).map(([id, session]) =>
-      serializeGame(session.game, id)
-    )
-  })
 
 // Router
 export const router = {
@@ -320,8 +329,6 @@ export const router = {
     create: createGameProcedure,
     join: joinGameProcedure,
     get: getGameProcedure,
-    start: startGameProcedure,
-    watch: watchGameProcedure,
     list: listGamesProcedure,
   },
 }

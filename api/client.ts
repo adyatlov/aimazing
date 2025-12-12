@@ -19,8 +19,8 @@ export const client: RouterClient<Router> = createORPCClient(link)
 export function getWebSocketUrl(): string {
   const url = new URL(SERVER_URL)
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
-  return url.toString()
+  return url.toString().replace(/\/$/, '')
 }
 
 export type { Router }
-export type { SerializedGame } from '../server/router'
+export type { SerializedGame, GameListItem } from '../server/router'

@@ -1,86 +1,79 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation } from '@tanstack/react-query'
 import { client, getWebSocketUrl } from '../../api/client'
 import type { SerializedGame } from '../../api/client'
 
-export function useCreateGame() {
-  const queryClient = useQueryClient()
+// Cookie helpers
+function getCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null
+  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'))
+  return match ? decodeURIComponent(match[2]) : null
+}
 
+function setCookie(name: string, value: string, days: number = 30) {
+  if (typeof document === 'undefined') return
+  const expires = new Date(Date.now() + days * 864e5).toUTCString()
+  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`
+}
+
+export function getPlayerSecret(gameId: string): string | null {
+  return getCookie(`player_${gameId}`)
+}
+
+export function setPlayerSecret(gameId: string, secret: string) {
+  setCookie(`player_${gameId}`, secret)
+}
+
+export function useCreateGame() {
   return useMutation({
     mutationFn: async (params: { mazeSize?: number; maxTurns?: number }) => {
       return client.game.create(params)
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['games'] })
     },
   })
 }
 
 export function useJoinGame() {
-  const queryClient = useQueryClient()
-
   return useMutation({
     mutationFn: async (params: { gameId: string; name: string; prompt: string }) => {
-      return client.game.join(params)
-    },
-    onSuccess: (data) => {
-      queryClient.setQueryData(['game', data.id], data)
-      queryClient.invalidateQueries({ queryKey: ['games'] })
-    },
-  })
-}
-
-export function useStartGame() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: async (gameId: string) => {
-      return client.game.start({ gameId })
-    },
-    onSuccess: (_, gameId) => {
-      queryClient.invalidateQueries({ queryKey: ['game', gameId] })
+      const result = await client.game.join(params)
+      // Store player secret in cookie
+      setPlayerSecret(params.gameId, result.playerSecret)
+      return result
     },
   })
 }
 
 export function useGame(gameId: string | null) {
-  const queryClient = useQueryClient()
+  const [game, setGame] = useState<SerializedGame | null>(null)
+  const [connected, setConnected] = useState(false)
+  const [error, setError] = useState<Error | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
-  const [wsConnected, setWsConnected] = useState(false)
 
-  // Initial fetch
-  const query = useQuery({
-    queryKey: ['game', gameId],
-    queryFn: async () => {
-      if (!gameId) throw new Error('No game ID')
-      return client.game.get({ gameId })
-    },
-    enabled: !!gameId,
-    staleTime: Infinity, // WebSocket will handle updates
-  })
-
-  // WebSocket connection for real-time updates
   useEffect(() => {
     if (!gameId) return
 
+    const playerSecret = getPlayerSecret(gameId)
     const wsUrl = getWebSocketUrl()
     const ws = new WebSocket(wsUrl)
     wsRef.current = ws
 
     ws.onopen = () => {
-      setWsConnected(true)
-      // Subscribe to game updates
-      ws.send(JSON.stringify({ type: 'subscribe', gameId }))
+      setConnected(true)
+      ws.send(JSON.stringify({
+        type: 'subscribeGame',
+        gameId,
+        playerSecret,
+      }))
     }
 
     ws.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data)
         if (message.type === 'gameUpdate' && message.game) {
-          // Update the query cache with new game state
-          queryClient.setQueryData(['game', gameId], message.game)
+          setGame(message.game)
+          setError(null)
         }
       } catch (e) {
         console.error('Failed to parse WebSocket message:', e)
@@ -88,35 +81,34 @@ export function useGame(gameId: string | null) {
     }
 
     ws.onclose = () => {
-      setWsConnected(false)
+      setConnected(false)
     }
 
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error)
-      setWsConnected(false)
+    ws.onerror = () => {
+      setConnected(false)
+      setError(new Error('WebSocket connection failed'))
     }
 
     return () => {
       if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'unsubscribe' }))
+        ws.send(JSON.stringify({ type: 'unsubscribeGame' }))
       }
       ws.close()
       wsRef.current = null
     }
-  }, [gameId, queryClient])
+  }, [gameId])
+
+  // Check if current user is a player in this game
+  const playerSecret = gameId ? getPlayerSecret(gameId) : null
+  const isPlayer = game?.players.some(p => p.prompt !== undefined) ?? false
 
   return {
-    ...query,
-    wsConnected,
+    game,
+    connected,
+    error,
+    isPlayer,
+    playerSecret,
   }
-}
-
-export function useGamesList() {
-  return useQuery({
-    queryKey: ['games'],
-    queryFn: () => client.game.list({}),
-    refetchInterval: 5000,
-  })
 }
 
 export type { SerializedGame }

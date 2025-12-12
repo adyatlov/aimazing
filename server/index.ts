@@ -2,7 +2,15 @@ import 'dotenv/config'
 import { createServer } from 'http'
 import { WebSocketServer, WebSocket } from 'ws'
 import { RPCHandler } from '@orpc/server/fetch'
-import { router, subscribeToGame, unsubscribeFromGame, type SerializedGame } from './router'
+import {
+  router,
+  subscribeToGame,
+  unsubscribeFromGame,
+  subscribeToGameList,
+  unsubscribeFromGameList,
+  type SerializedGame,
+  type GameListItem,
+} from './router'
 
 const PORT = process.env.PORT || 3001
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:3000'
@@ -33,7 +41,6 @@ const server = createServer(async (req, res) => {
   // Handle oRPC requests
   if (req.url?.startsWith('/rpc')) {
     try {
-      // Convert Node request to Fetch Request
       const protocol = 'http'
       const host = req.headers.host || 'localhost'
       const url = new URL(req.url, `${protocol}://${host}`)
@@ -75,7 +82,19 @@ const server = createServer(async (req, res) => {
 })
 
 // WebSocket server
-const wss = new WebSocketServer({ server })
+const wss = new WebSocketServer({
+  server,
+  verifyClient: (info, callback) => {
+    const origin = info.origin || info.req.headers.origin
+    // Allow connections from CORS_ORIGIN or no origin (like curl/node)
+    if (!origin || origin === CORS_ORIGIN || origin === 'http://localhost:3000') {
+      callback(true)
+    } else {
+      console.log('Rejected WebSocket from origin:', origin)
+      callback(false, 403, 'Forbidden')
+    }
+  }
+})
 
 wss.on('error', (err: NodeJS.ErrnoException) => {
   if (err.code === 'EADDRINUSE') {
@@ -88,28 +107,62 @@ wss.on('error', (err: NodeJS.ErrnoException) => {
 })
 
 wss.on('connection', (ws: WebSocket) => {
-  console.log('WebSocket client connected')
   let subscribedGameId: string | null = null
+  let isSubscribedToList = false
+  let gameCallback: ((game: SerializedGame) => void) | null = null
+  let listCallback: ((games: GameListItem[]) => void) | null = null
 
   ws.on('message', (data: Buffer) => {
     try {
       const message = JSON.parse(data.toString())
 
-      if (message.type === 'subscribe' && message.gameId) {
+      // Subscribe to game list updates
+      if (message.type === 'subscribeList') {
+        if (!isSubscribedToList) {
+          listCallback = (games: GameListItem[]) => {
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ type: 'gameList', games }))
+            }
+          }
+          subscribeToGameList(listCallback)
+          isSubscribedToList = true
+        }
+      }
+
+      // Unsubscribe from game list
+      if (message.type === 'unsubscribeList') {
+        if (isSubscribedToList && listCallback) {
+          unsubscribeFromGameList(listCallback)
+          isSubscribedToList = false
+          listCallback = null
+        }
+      }
+
+      // Subscribe to a specific game
+      if (message.type === 'subscribeGame' && message.gameId) {
         // Unsubscribe from previous game if any
-        if (subscribedGameId) {
-          unsubscribeFromGame(subscribedGameId, sendUpdate)
+        if (subscribedGameId && gameCallback) {
+          unsubscribeFromGame(subscribedGameId, gameCallback)
         }
 
         subscribedGameId = message.gameId
-        subscribeToGame(message.gameId, sendUpdate)
-        console.log(`Client subscribed to game ${message.gameId}`)
+        const playerSecret = message.playerSecret
+
+        gameCallback = (game: SerializedGame) => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'gameUpdate', game }))
+          }
+        }
+
+        subscribeToGame(message.gameId, gameCallback, playerSecret)
       }
 
-      if (message.type === 'unsubscribe') {
-        if (subscribedGameId) {
-          unsubscribeFromGame(subscribedGameId, sendUpdate)
+      // Unsubscribe from game
+      if (message.type === 'unsubscribeGame') {
+        if (subscribedGameId && gameCallback) {
+          unsubscribeFromGame(subscribedGameId, gameCallback)
           subscribedGameId = null
+          gameCallback = null
         }
       }
     } catch (e) {
@@ -118,17 +171,13 @@ wss.on('connection', (ws: WebSocket) => {
   })
 
   ws.on('close', () => {
-    if (subscribedGameId) {
-      unsubscribeFromGame(subscribedGameId, sendUpdate)
+    if (subscribedGameId && gameCallback) {
+      unsubscribeFromGame(subscribedGameId, gameCallback)
     }
-    console.log('WebSocket client disconnected')
+    if (isSubscribedToList && listCallback) {
+      unsubscribeFromGameList(listCallback)
+    }
   })
-
-  function sendUpdate(game: SerializedGame) {
-    if (ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: 'gameUpdate', game }))
-    }
-  }
 })
 
 server.on('error', (err: NodeJS.ErrnoException) => {
