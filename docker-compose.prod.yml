@@ -32,6 +32,7 @@ services:
       - WORKOS_CLIENT_ID=${WORKOS_CLIENT_ID}
       - WORKOS_API_KEY=${WORKOS_API_KEY}
       - WORKOS_COOKIE_PASSWORD=${WORKOS_COOKIE_PASSWORD}
+      - WORKOS_REDIRECT_URI=${WORKOS_REDIRECT_URI:-https://aimazing.dyatlov.net/callback}
       - NEXT_PUBLIC_SERVER_URL=${NEXT_PUBLIC_SERVER_URL:-https://aimazing-api.dyatlov.net}
       - NEXT_PUBLIC_WORKOS_REDIRECT_URI=${NEXT_PUBLIC_WORKOS_REDIRECT_URI:-https://aimazing.dyatlov.net/callback}
     networks:
