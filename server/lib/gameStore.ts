@@ -21,9 +21,9 @@ export interface GameListItem {
 }
 
 export interface GameStore {
-  create(id: string, creatorId: string, creatorName: string, creatorPrompt: string, state: GameState): void
+  create(id: string, userId: string, name: string, prompt: string, state: GameState): void
   get(id: string): Game | null
-  join(id: string, opponentId: string, opponentName: string, opponentPrompt: string): Game
+  join(id: string, userId: string, name: string, prompt: string): Game
   update(id: string, state: GameState, status: GameStatus): void
-  list(includeFinished: boolean): GameListItem[]
+  list(userId: string, includeFinished: boolean): GameListItem[]
 }

@@ -4,6 +4,7 @@ import Link from "next/link"
 import { withAuth, signOut } from "@workos-inc/authkit-nextjs"
 import "./globals.css"
 import { Providers } from "./providers"
+import { UserProvider } from "./contexts/UserContext"
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
@@ -25,6 +26,7 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistMono.variable} font-mono antialiased bg-zinc-950 text-zinc-100`} suppressHydrationWarning>
+        <UserProvider userId={user.id}>
         <Providers>
           <div className="min-h-screen flex flex-col">
             {/* Header */}
@@ -60,6 +62,7 @@ export default async function RootLayout({
             </main>
           </div>
         </Providers>
+        </UserProvider>
       </body>
     </html>
   )

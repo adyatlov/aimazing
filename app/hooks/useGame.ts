@@ -3,20 +3,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { client, getWebSocketUrl } from '../../api/client'
+import { useUserId } from '../contexts/UserContext'
 import type { GameResponse } from '../../api/client'
 
-// Store playerId for each game in localStorage
-export function getPlayerId(gameId: string): string | null {
-  if (typeof window === 'undefined') return null
-  return localStorage.getItem(`player_${gameId}`)
-}
-
-export function setPlayerId(gameId: string, playerId: string) {
-  if (typeof window === 'undefined') return
-  localStorage.setItem(`player_${gameId}`, playerId)
-}
-
 export function useCreateGame() {
+  const userId = useUserId()
   return useMutation({
     mutationFn: async (params: {
       mazeSize?: number
@@ -24,31 +15,26 @@ export function useCreateGame() {
       name: string
       prompt: string
     }) => {
-      const result = await client.game.create(params)
-      setPlayerId(result.gameId, result.playerId)
-      return result
+      return await client.game.create({ ...params, userId })
     },
   })
 }
 
 export function useJoinGame() {
+  const userId = useUserId()
   return useMutation({
     mutationFn: async (params: { gameId: string; name: string; prompt: string }) => {
-      const result = await client.game.join(params)
-      setPlayerId(params.gameId, result.playerId)
-      return result
+      return await client.game.join({ ...params, userId })
     },
   })
 }
 
 export function useGame(gameId: string | null) {
+  const userId = useUserId()
   const [game, setGame] = useState<GameResponse | null>(null)
   const [connected, setConnected] = useState(false)
   const [error, setError] = useState<Error | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
-
-  // Get playerId for this game (if we're a player)
-  const playerId = gameId ? getPlayerId(gameId) : null
 
   useEffect(() => {
     if (!gameId) return
@@ -62,7 +48,7 @@ export function useGame(gameId: string | null) {
       ws.send(JSON.stringify({
         type: 'subscribeGame',
         gameId,
-        playerId,
+        playerId: userId,
       }))
     }
 
@@ -97,7 +83,7 @@ export function useGame(gameId: string | null) {
       ws.close()
       wsRef.current = null
     }
-  }, [gameId, playerId])
+  }, [gameId, userId])
 
   // Check if current user is a player (their prompt is visible)
   const isPlayer = game?.myPrompt !== undefined
@@ -107,7 +93,6 @@ export function useGame(gameId: string | null) {
     connected,
     error,
     isPlayer,
-    playerId,
   }
 }
 

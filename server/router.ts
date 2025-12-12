@@ -68,7 +68,7 @@ function gameToResponse(game: Game, viewerPlayerId?: string): GameResponse {
 
 // Runtime state for WebSocket subscriptions
 const gameSubscribers = new Map<string, Set<(game: GameResponse) => void>>()
-const listSubscribers = new Set<(list: GameListItem[]) => void>()
+const listSubscribers = new Map<(list: GameListItem[]) => void, string>() // callback -> userId
 const runningGames = new Set<string>()
 
 function broadcastGame(gameId: string) {
@@ -82,9 +82,13 @@ function broadcastGame(gameId: string) {
 }
 
 function broadcastList() {
-  const list = gameStore.list(false)
-  for (const cb of listSubscribers) {
-    try { cb(list) } catch { listSubscribers.delete(cb) }
+  for (const [cb, userId] of listSubscribers) {
+    try {
+      const list = gameStore.list(userId, false)
+      cb(list)
+    } catch {
+      listSubscribers.delete(cb)
+    }
   }
 }
 
@@ -111,9 +115,9 @@ export function unsubscribeFromGame(gameId: string, callback: (game: GameRespons
   gameSubscribers.get(gameId)?.delete(callback)
 }
 
-export function subscribeToGameList(callback: (list: GameListItem[]) => void): void {
-  listSubscribers.add(callback)
-  callback(gameStore.list(false))
+export function subscribeToGameList(userId: string, callback: (list: GameListItem[]) => void): void {
+  listSubscribers.set(callback, userId)
+  callback(gameStore.list(userId, false))
 }
 
 export function unsubscribeFromGameList(callback: (list: GameListItem[]) => void): void {
@@ -152,33 +156,33 @@ async function runGameLoop(gameId: string): Promise<void> {
 // API Procedures
 export const createGameProcedure = os
   .input(z.object({
+    userId: z.string(),
     mazeSize: z.number().min(7).max(51).default(15),
     maxTurns: z.number().min(10).max(1000).optional(),
     name: z.string().min(1).max(20),
     prompt: z.string().min(1).max(500),
   }))
-  .output(z.object({ gameId: z.string(), playerId: z.string() }))
+  .output(z.object({ gameId: z.string() }))
   .handler(async ({ input }) => {
     const gameId = generateId()
-    const playerId = generateId()
     const state = createGameState(input.mazeSize, input.maxTurns)
 
-    gameStore.create(gameId, playerId, input.name, input.prompt, state)
+    gameStore.create(gameId, input.userId, input.name, input.prompt, state)
     broadcastList()
 
-    return { gameId, playerId }
+    return { gameId }
   })
 
 export const joinGameProcedure = os
   .input(z.object({
     gameId: z.string(),
+    userId: z.string(),
     name: z.string().min(1).max(20),
     prompt: z.string().min(1).max(500),
   }))
-  .output(z.object({ playerId: z.string(), game: GameResponseSchema }))
+  .output(z.object({ game: GameResponseSchema }))
   .handler(async ({ input }) => {
-    const playerId = generateId()
-    const game = gameStore.join(input.gameId, playerId, input.name, input.prompt)
+    const game = gameStore.join(input.gameId, input.userId, input.name, input.prompt)
 
     broadcastGame(input.gameId)
     broadcastList()
@@ -189,7 +193,7 @@ export const joinGameProcedure = os
       runGameLoop(input.gameId).catch(console.error)
     }
 
-    return { playerId, game: gameToResponse(game, playerId) }
+    return { game: gameToResponse(game, input.userId) }
   })
 
 export const getGameProcedure = os
@@ -205,10 +209,13 @@ export const getGameProcedure = os
   })
 
 export const listGamesProcedure = os
-  .input(z.object({ includeFinished: z.boolean().default(false) }))
+  .input(z.object({
+    userId: z.string(),
+    includeFinished: z.boolean().default(false),
+  }))
   .output(z.array(GameListItemSchema))
   .handler(async ({ input }) => {
-    return gameStore.list(input.includeFinished)
+    return gameStore.list(input.userId, input.includeFinished)
   })
 
 // Router

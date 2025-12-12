@@ -39,23 +39,23 @@ function dbToGame(db: DbGame): Game {
 class SqliteGameStore implements GameStore {
   private cache = new Map<string, Game>()
 
-  create(id: string, creatorId: string, creatorName: string, creatorPrompt: string, state: GameState): void {
+  create(id: string, userId: string, name: string, prompt: string, state: GameState): void {
     // Add creator's mouse
     state.mice = [{
-      name: creatorName,
+      name,
       position: { ...state.entrance },
       facing: 'SOUTH',
       explored: new Set([`${state.entrance.x},${state.entrance.y}`]),
       actionHistory: [],
     }]
 
-    createGameDb(id, creatorId, creatorPrompt, serializeState(state))
+    createGameDb(id, userId, prompt, serializeState(state))
 
     this.cache.set(id, {
       id,
       status: 'WAITING',
-      creatorId,
-      creatorPrompt,
+      creatorId: userId,
+      creatorPrompt: prompt,
       opponentId: null,
       opponentPrompt: null,
       state,
@@ -75,7 +75,7 @@ class SqliteGameStore implements GameStore {
     return game
   }
 
-  join(id: string, opponentId: string, opponentName: string, opponentPrompt: string): Game {
+  join(id: string, userId: string, name: string, prompt: string): Game {
     const game = this.get(id)
     if (!game) throw new Error('Game not found')
     if (game.status !== 'WAITING') throw new Error('Game not waiting for opponent')
@@ -83,18 +83,18 @@ class SqliteGameStore implements GameStore {
 
     // Add opponent's mouse
     game.state.mice.push({
-      name: opponentName,
+      name,
       position: { ...game.state.entrance },
       facing: 'SOUTH',
       explored: new Set([`${game.state.entrance.x},${game.state.entrance.y}`]),
       actionHistory: [],
     })
 
-    game.opponentId = opponentId
-    game.opponentPrompt = opponentPrompt
+    game.opponentId = userId
+    game.opponentPrompt = prompt
     game.status = 'PLAYING'
 
-    updateGameDb(id, game.status, opponentId, opponentPrompt, serializeState(game.state))
+    updateGameDb(id, game.status, userId, prompt, serializeState(game.state))
     return game
   }
 
@@ -108,10 +108,16 @@ class SqliteGameStore implements GameStore {
     updateGameDb(id, status, game.opponentId, game.opponentPrompt, serializeState(state))
   }
 
-  list(includeFinished: boolean): GameListItem[] {
+  list(userId: string, includeFinished: boolean): GameListItem[] {
     const all = getAllGames()
     return all
-      .filter(db => includeFinished || db.status === 'WAITING' || db.status === 'PLAYING')
+      .filter(db => {
+        // Only show games where user is creator or opponent
+        const isMyGame = db.creator_id === userId || db.opponent_id === userId
+        if (!isMyGame) return false
+        // Filter by status
+        return includeFinished || db.status === 'WAITING' || db.status === 'PLAYING'
+      })
       .map(db => {
         const state = deserializeState(db.game_state)
         return {

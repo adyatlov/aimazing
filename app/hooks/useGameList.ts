@@ -2,9 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { getWebSocketUrl } from '../../api/client'
+import { useUserId } from '../contexts/UserContext'
 import type { GameListItem } from '../../api/client'
 
 export function useGameList(includeFinished: boolean = false) {
+  const userId = useUserId()
   const [games, setGames] = useState<GameListItem[]>([])
   const [connected, setConnected] = useState(false)
   const wsRef = useRef<WebSocket | null>(null)
@@ -16,7 +18,7 @@ export function useGameList(includeFinished: boolean = false) {
 
     ws.onopen = () => {
       setConnected(true)
-      ws.send(JSON.stringify({ type: 'subscribeList' }))
+      ws.send(JSON.stringify({ type: 'subscribeList', userId }))
     }
 
     ws.onmessage = (event) => {
@@ -49,7 +51,7 @@ export function useGameList(includeFinished: boolean = false) {
       ws.close()
       wsRef.current = null
     }
-  }, [includeFinished])
+  }, [userId, includeFinished])
 
   return { games, connected }
 }

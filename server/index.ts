@@ -126,14 +126,14 @@ wss.on('connection', (ws: WebSocket) => {
       console.log('⚡ WS message:', message.type)
 
       // Subscribe to game list updates
-      if (message.type === 'subscribeList') {
+      if (message.type === 'subscribeList' && message.userId) {
         if (!isSubscribedToList) {
           listCallback = (games: GameListItem[]) => {
             if (ws.readyState === WebSocket.OPEN) {
               ws.send(JSON.stringify({ type: 'gameList', games }))
             }
           }
-          subscribeToGameList(listCallback)
+          subscribeToGameList(message.userId, listCallback)
           isSubscribedToList = true
         }
       }
