@@ -1,0 +1,49 @@
+services:
+  aimazing_server:
+    container_name: aimazing_server
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    environment:
+      - PORT=3001
+      - DB_PATH=/data/aimazing.db
+      - CORS_ORIGIN=${CORS_ORIGIN:-https://aimazing.guterco.de}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4.1-nano}
+    volumes:
+      - aimazing_data:/data
+    networks:
+      - knowlem_knowlem
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  aimazing_client:
+    container_name: aimazing_client
+    build:
+      context: .
+      dockerfile: Dockerfile.client
+      args:
+        - NEXT_PUBLIC_SERVER_URL=${NEXT_PUBLIC_SERVER_URL:-https://aimazing-api.guterco.de}
+    environment:
+      - WORKOS_CLIENT_ID=${WORKOS_CLIENT_ID}
+      - WORKOS_API_KEY=${WORKOS_API_KEY}
+      - WORKOS_COOKIE_PASSWORD=${WORKOS_COOKIE_PASSWORD}
+      - NEXT_PUBLIC_SERVER_URL=${NEXT_PUBLIC_SERVER_URL:-https://aimazing-api.guterco.de}
+    networks:
+      - knowlem_knowlem
+    depends_on:
+      aimazing_server:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  aimazing_data:
+    name: aimazing_data
+
+networks:
+  knowlem_knowlem:
+    external: true
