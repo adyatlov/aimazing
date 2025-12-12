@@ -3,6 +3,8 @@ import { openai } from '@ai-sdk/openai'
 import { z } from 'zod'
 import type { MouseAction, MouseVision, CellType } from './types'
 
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4.1-nano'
+
 const actionSchema = z.object({
   reason: z.string().describe('Brief reason for this action'),
 })
@@ -79,7 +81,7 @@ export async function getAction(
 
   try {
     const result = await generateText({
-      model: openai.chat('gpt-4o-mini'),
+      model: openai.chat(OPENAI_MODEL),
       system: SYSTEM_PROMPT,
       prompt: userPrompt,
       tools: {
