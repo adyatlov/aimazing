@@ -5,25 +5,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { useGame, useJoinGame } from '../../hooks/useGame'
 import { MazeRenderer } from '../../components/MazeRenderer'
-
-const PRESET_STRATEGIES = [
-  {
-    name: 'Right-hand rule',
-    prompt: 'Follow the right-hand rule: if right is clear, turn right and move forward. Otherwise if front is clear, move forward. Otherwise turn left.',
-  },
-  {
-    name: 'Left-hand rule',
-    prompt: 'Follow the left-hand rule: if left is clear, turn left and move forward. Otherwise if front is clear, move forward. Otherwise turn right.',
-  },
-  {
-    name: 'Explorer',
-    prompt: 'Prefer unexplored paths. If multiple options, choose the one you have visited least. Avoid backtracking unless necessary.',
-  },
-  {
-    name: 'Random walker',
-    prompt: 'Move randomly but avoid hitting walls. If stuck, turn around.',
-  },
-]
+import { StrategyForm } from '../../components/StrategyForm'
 
 function ShareLink({ gameId }: { gameId: string }) {
   const [copied, setCopied] = useState(false)
@@ -80,7 +62,6 @@ export default function GamePage() {
   const [playerName, setPlayerName] = useState('')
   const [prompt, setPrompt] = useState('')
 
-  // Can join if: game is waiting, only 1 mouse, and we're not already a player
   const canJoin = game?.status === 'WAITING' && game.mice.length < 2 && !isPlayer
 
   const handleJoin = async () => {
@@ -96,7 +77,7 @@ export default function GamePage() {
   // Loading state
   if (!game && !error) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-8">
+      <div className="min-h-[60vh] flex flex-col items-center justify-center p-8">
         <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
         <p className="text-zinc-400 mt-4">Loading game...</p>
       </div>
@@ -107,7 +88,7 @@ export default function GamePage() {
   if (error) {
     const isNotFound = error.message === 'Game not found'
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-8">
+      <div className="min-h-[60vh] flex flex-col items-center justify-center p-8">
         <div className="text-center">
           {isNotFound ? (
             <>
@@ -136,7 +117,7 @@ export default function GamePage() {
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-6">
-      {/* Game Status Bar */}
+      {/* Status Bar */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <span className="text-zinc-500 font-mono text-sm">{gameId}</span>
@@ -154,7 +135,7 @@ export default function GamePage() {
         </span>
       </div>
 
-      {/* Progress bar (when playing/finished) */}
+      {/* Progress bar */}
       {game.status !== 'WAITING' && (
         <div className="mb-6">
           <div className="flex justify-between text-xs text-zinc-500 mb-1">
@@ -172,7 +153,9 @@ export default function GamePage() {
 
       {/* Maze */}
       <div className="flex justify-center mb-6">
-        <MazeRenderer game={game} size="lg" />
+        <div className="bg-zinc-900/30 rounded-xl p-4 border border-zinc-800">
+          <MazeRenderer game={game} size="lg" />
+        </div>
       </div>
 
       {/* Player Cards */}
@@ -217,48 +200,18 @@ export default function GamePage() {
             </div>
           </div>
         ) : canJoin ? (
-          <div className="p-4 rounded-xl border bg-zinc-900/50 border-zinc-800">
-            <h3 className="font-semibold mb-3">Join Game</h3>
-            <div className="space-y-3">
-              <input
-                type="text"
-                value={playerName}
-                onChange={(e) => setPlayerName(e.target.value)}
-                placeholder="Your name (optional)"
-                maxLength={20}
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-emerald-500"
-              />
-              <textarea
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                placeholder="Describe your AI strategy..."
-                maxLength={500}
-                rows={2}
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-emerald-500 resize-none"
-              />
-              <div className="flex flex-wrap gap-1">
-                {PRESET_STRATEGIES.map((s) => (
-                  <button
-                    key={s.name}
-                    onClick={() => setPrompt(s.prompt)}
-                    className="px-2 py-1 text-xs bg-zinc-800 hover:bg-zinc-700 rounded transition-colors"
-                  >
-                    {s.name}
-                  </button>
-                ))}
-              </div>
-              <button
-                onClick={handleJoin}
-                disabled={joinGame.isPending || !prompt.trim()}
-                className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 text-white font-medium py-2 px-4 rounded-lg transition-colors text-sm"
-              >
-                {joinGame.isPending ? 'Joining...' : 'Join Game'}
-              </button>
-              {joinGame.error && (
-                <p className="text-red-400 text-xs">{joinGame.error.message}</p>
-              )}
-            </div>
-          </div>
+          <StrategyForm
+            title="Join Game"
+            name={playerName}
+            setName={setPlayerName}
+            prompt={prompt}
+            setPrompt={setPrompt}
+            onSubmit={handleJoin}
+            submitLabel="Join Game"
+            submitting={joinGame.isPending}
+            error={joinGame.error?.message}
+            namePlaceholder="Player 2"
+          />
         ) : isPlayer ? (
           <div className="p-4 rounded-xl border border-dashed border-zinc-700 bg-zinc-900/30 flex flex-col items-center justify-center text-center">
             <p className="text-zinc-400 mb-3">Waiting for opponent...</p>

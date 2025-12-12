@@ -4,31 +4,13 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCreateGame, usePreviewMaze } from '../../hooks/useGame'
 import { MazePreviewRenderer } from '../../components/MazePreview'
+import { StrategyForm } from '../../components/StrategyForm'
 
 const MAZE_SIZES = [
-  { value: 11, label: 'Small', desc: '11x11' },
-  { value: 15, label: 'Medium', desc: '15x15' },
-  { value: 21, label: 'Large', desc: '21x21' },
-  { value: 31, label: 'Huge', desc: '31x31' },
-]
-
-const PRESET_STRATEGIES = [
-  {
-    name: 'Right-hand rule',
-    prompt: 'Follow the right-hand rule: if right is clear, turn right and move forward. Otherwise if front is clear, move forward. Otherwise turn left.',
-  },
-  {
-    name: 'Left-hand rule',
-    prompt: 'Follow the left-hand rule: if left is clear, turn left and move forward. Otherwise if front is clear, move forward. Otherwise turn right.',
-  },
-  {
-    name: 'Explorer',
-    prompt: 'Prefer unexplored paths. If multiple options, choose the one you have visited least. Avoid backtracking unless necessary.',
-  },
-  {
-    name: 'Random walker',
-    prompt: 'Move randomly but avoid hitting walls. If stuck, turn around.',
-  },
+  { value: 11, label: 'S' },
+  { value: 15, label: 'M' },
+  { value: 21, label: 'L' },
+  { value: 31, label: 'XL' },
 ]
 
 export default function NewGamePage() {
@@ -40,13 +22,11 @@ export default function NewGamePage() {
   const [playerName, setPlayerName] = useState('')
   const [playerPrompt, setPlayerPrompt] = useState('')
 
-  // Generate maze on mount and when size changes
   useEffect(() => {
     generate(mazeSize)
   }, [mazeSize, generate])
 
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleCreate = async () => {
     if (!playerPrompt.trim() || !maze) return
 
     const name = playerName.trim() || 'Player 1'
@@ -59,117 +39,88 @@ export default function NewGamePage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-8">
-      <h2 className="text-2xl font-bold text-center mb-8">Create New Game</h2>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Left: Maze Preview */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <label className="text-sm text-zinc-400">Maze Preview</label>
-            <button
-              type="button"
-              onClick={() => generate(mazeSize)}
-              disabled={mazeLoading}
-              className="text-sm text-emerald-400 hover:text-emerald-300 disabled:text-zinc-600"
-            >
-              {mazeLoading ? 'Generating...' : 'Regenerate'}
-            </button>
-          </div>
-
-          {/* Maze Size Selector */}
-          <div className="grid grid-cols-4 gap-2">
-            {MAZE_SIZES.map((size) => (
-              <button
-                key={size.value}
-                type="button"
-                onClick={() => setMazeSize(size.value)}
-                className={`px-3 py-2 rounded-lg text-sm transition-colors ${
-                  mazeSize === size.value
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
-                }`}
-              >
-                <div className="font-medium">{size.label}</div>
-                <div className="text-xs opacity-70">{size.desc}</div>
-              </button>
-            ))}
-          </div>
-
-          {/* Maze Display */}
-          <div className="flex justify-center">
-            {maze ? (
-              <MazePreviewRenderer maze={maze} size="md" />
-            ) : (
-              <div className="w-64 h-64 bg-zinc-900 rounded-lg flex items-center justify-center">
-                <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-              </div>
-            )}
-          </div>
-
-          <p className="text-xs text-zinc-500 text-center">
-            S = Start (entrance) · E = Exit (goal)
-          </p>
+    <div className="max-w-5xl mx-auto px-6 py-6">
+      {/* Status Bar */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <span className="px-2 py-1 rounded text-xs font-medium bg-blue-900/50 text-blue-400">
+            NEW GAME
+          </span>
         </div>
-
-        {/* Right: Form */}
-        <form onSubmit={handleCreate} className="space-y-6">
-          {/* Player Name */}
-          <div>
-            <label className="block text-sm text-zinc-400 mb-1">
-              Your Mouse Name <span className="text-zinc-600">(optional)</span>
-            </label>
-            <input
-              type="text"
-              value={playerName}
-              onChange={(e) => setPlayerName(e.target.value)}
-              placeholder="Player 1"
-              maxLength={20}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-emerald-500"
-            />
-          </div>
-
-          {/* Strategy Prompt */}
-          <div>
-            <label className="block text-sm text-zinc-400 mb-1">AI Strategy Prompt</label>
-            <textarea
-              value={playerPrompt}
-              onChange={(e) => setPlayerPrompt(e.target.value)}
-              placeholder="Describe how your AI mouse should navigate the maze..."
-              maxLength={500}
-              rows={5}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-emerald-500 resize-none"
-            />
-            <div className="mt-2">
-              <span className="text-xs text-zinc-500">Or pick a preset:</span>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {PRESET_STRATEGIES.map((strategy) => (
-                  <button
-                    key={strategy.name}
-                    type="button"
-                    onClick={() => setPlayerPrompt(strategy.prompt)}
-                    className="px-3 py-1 text-xs bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-colors"
-                  >
-                    {strategy.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Submit */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-zinc-500">Size:</span>
+          {MAZE_SIZES.map((size) => (
+            <button
+              key={size.value}
+              type="button"
+              onClick={() => setMazeSize(size.value)}
+              className={`w-7 h-7 rounded text-xs font-medium transition-colors ${
+                mazeSize === size.value
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+              }`}
+            >
+              {size.label}
+            </button>
+          ))}
           <button
-            type="submit"
-            disabled={createGame.isPending || !playerPrompt.trim() || !maze}
-            className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 disabled:cursor-not-allowed text-white font-semibold py-4 px-8 rounded-xl transition-colors text-lg"
+            type="button"
+            onClick={() => generate(mazeSize)}
+            disabled={mazeLoading}
+            title="Generate new maze"
+            className="w-7 h-7 flex items-center justify-center rounded bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200 disabled:opacity-50 transition-colors ml-1"
           >
-            {createGame.isPending ? 'Creating...' : 'Create Game'}
+            <svg className={`w-4 h-4 ${mazeLoading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
           </button>
+        </div>
+      </div>
 
-          {createGame.error && (
-            <p className="text-red-400 text-sm text-center">{createGame.error.message}</p>
+      {/* Maze */}
+      <div className="flex justify-center mb-6">
+        <div className="bg-zinc-900/30 rounded-xl p-4 border border-zinc-800">
+          {maze ? (
+            <MazePreviewRenderer maze={maze} size="lg" />
+          ) : (
+            <div className="w-[400px] h-[400px] flex items-center justify-center">
+              <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+            </div>
           )}
-        </form>
+        </div>
+      </div>
+
+      {/* Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Player Setup */}
+        <StrategyForm
+          title="Your Mouse"
+          name={playerName}
+          setName={setPlayerName}
+          prompt={playerPrompt}
+          setPrompt={setPlayerPrompt}
+          onSubmit={handleCreate}
+          submitLabel="Create Game"
+          submitting={createGame.isPending}
+          error={createGame.error?.message}
+          namePlaceholder="Player 1"
+        />
+
+        {/* Instructions */}
+        <div className="p-4 rounded-xl border border-dashed border-zinc-700 bg-zinc-900/30 flex flex-col justify-center">
+          <h3 className="font-semibold mb-2 text-zinc-400">How to Play</h3>
+          <ul className="text-xs text-zinc-500 space-y-1.5">
+            <li>• Choose a maze size and regenerate until you like it</li>
+            <li>• Write a strategy prompt for your AI mouse</li>
+            <li>• Share the game link with a friend to challenge them</li>
+            <li>• First mouse to reach the exit wins!</li>
+          </ul>
+          <div className="mt-4 pt-3 border-t border-zinc-800">
+            <p className="text-xs text-zinc-600">
+              <span className="text-yellow-500">S</span> = Start · <span className="text-emerald-400">E</span> = Exit
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   )
