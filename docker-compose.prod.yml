@@ -13,7 +13,7 @@ services:
     volumes:
       - aimazing_data:/data
     networks:
-      - knowlem_knowlem
+      - proxy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:3001/health"]
@@ -36,7 +36,7 @@ services:
       - NEXT_PUBLIC_SERVER_URL=${NEXT_PUBLIC_SERVER_URL:-https://aimazing-api.dyatlov.net}
       - NEXT_PUBLIC_WORKOS_REDIRECT_URI=${NEXT_PUBLIC_WORKOS_REDIRECT_URI:-https://aimazing.dyatlov.net/callback}
     networks:
-      - knowlem_knowlem
+      - proxy
     depends_on:
       aimazing_server:
         condition: service_healthy
@@ -47,5 +47,5 @@ volumes:
     name: aimazing_data
 
 networks:
-  knowlem_knowlem:
+  proxy:
     external: true
